@@ -1,0 +1,2484 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Manutenção (Upload + Manutenções) - v5</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --surface:#121a33;
+      --surface2:#0f1630;
+      --text:#e7eefc;
+      --muted:#9fb0d0;
+      --border:#243056;
+      --primary:#2dd4ff;
+      --primary2:#60a5fa;
+      --good:#22c55e;
+      --bad:#ef4444;
+      --warn:#f59e0b;
+      --radius:12px;
+      --shadow:0 14px 40px rgba(0,0,0,.35);
+    }
+    
+    :root[data-theme="light"]{
+      --bg:#f6f7f9;
+      --surface:#ffffff;
+      --surface2:#f1f2f4;
+      --text:#0b0f1a;
+      --muted:#5b6475;
+      --border:#d9dde5;
+      --primary:#111827;
+      --primary2:#111827;
+      --good:#16a34a;
+      --bad:#dc2626;
+      --warn:#d97706;
+      --shadow:0 12px 28px rgba(17,24,39,.10);
+    }
+*{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;
+      background:
+        radial-gradient(900px 500px at 15% 0%, rgba(45,212,255,.12), transparent 60%),
+        radial-gradient(800px 420px at 90% 10%, rgba(96,165,250,.12), transparent 60%),
+        var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1500px;margin:0 auto;padding:24px}
+
+    .header{
+      background:rgba(11,16,32,.65);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      padding:18px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .title{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+    .title h1{font-size:20px;letter-spacing:.3px}
+    .title p{color:var(--muted);font-size:12px}
+
+    .status{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(18,26,51,.7);color:var(--muted);font-size:12px}
+    .dot{width:9px;height:9px;border-radius:50%}
+    .dot.idle{background:var(--warn)}
+    .dot.ok{background:var(--good)}
+    .dot.err{background:var(--bad)}
+
+    .grid{display:grid;grid-template-columns: 1.2fr .8fr; gap:16px; margin-top:16px}
+    @media(max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .card{
+      background:rgba(18,26,51,.75);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .card .hd{padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .card .hd h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
+    .card .bd{padding:14px}
+
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
+    .btn-ghost:hover{border-color:var(--primary);}
+
+    .btn{border:1px solid rgba(45,212,255,.35);background:rgba(45,212,255,.10);color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer}
+    .btn:hover{border-color:rgba(45,212,255,.7)}
+    .btnPrimary{border:none;background:linear-gradient(90deg,var(--primary),var(--primary2));color:#061224;font-weight:900}
+    .btnDanger{border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.10)}
+    .btnDanger:hover{border-color:rgba(239,68,68,.85)}
+
+    .upload{border:2px dashed rgba(45,212,255,.35);background:linear-gradient(180deg, rgba(45,212,255,.06), rgba(18,26,51,.65));padding:16px;border-radius:var(--radius);cursor:pointer;transition:all .2s}
+    .upload:hover{border-color:rgba(96,165,250,.55);transform: translateY(-1px)}
+    .upload.drag{border-color:rgba(45,212,255,.9);background:rgba(45,212,255,.10)}
+    .upload strong{color:var(--text)}
+    .upload small{display:block;color:var(--muted);margin-top:6px}
+    input[type=file]{display:none}
+
+    .controls{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:10px}
+    @media(max-width:980px){.controls{grid-template-columns:1fr}}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    select,input{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(15,22,48,.9);color:var(--text);outline:none}
+    select:focus,input:focus{border-color:rgba(45,212,255,.8);box-shadow:0 0 0 3px rgba(45,212,255,.12)}
+
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    @media(max-width:980px){.metrics{grid-template-columns:1fr}}
+    .metric{padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(15,22,48,.6)}
+    .metric .k{font-size:12px;color:var(--muted)}
+    .metric .v{font-size:26px;font-weight:700;margin-top:6px;background:linear-gradient(90deg,var(--primary),var(--primary2));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+    .table{width:100%;border-collapse:collapse;font-size:13px}
+    .table thead th{position:sticky;top:0;background:rgba(18,26,51,.98);z-index:2}
+    .table th,.table td{padding:10px;border-bottom:1px solid rgba(36,48,86,.6);text-align:left;vertical-align:top}
+    .table th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .table tbody tr:hover{background:rgba(45,212,255,.05)}
+
+    .pn{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:rgba(45,212,255,.10);border:1px solid rgba(45,212,255,.22);padding:2px 6px;border-radius:8px}
+    .note{color:var(--muted);font-size:12px;line-height:1.35}
+    .chartWrap{height:340px}
+
+    /* Modal manutenção */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:18px;z-index:9999}
+    .modal.show{display:flex}
+    .modalCard{width:min(920px, 100%);background:rgba(18,26,51,.95);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .modalHd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border-bottom:1px solid var(--border)}
+    .modalHd h3{font-size:14px;color:var(--text)}
+    .modalBd{padding:14px}
+    .xBtn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:6px 10px;cursor:pointer}
+    .xBtn:hover{border-color:rgba(45,212,255,.6)}
+    .formGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media(max-width:820px){.formGrid{grid-template-columns:1fr}}
+    .small{font-size:12px;color:var(--muted)}
+  
+  .equipWrap{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; margin-top:12px; }
+  .equipPanel{ flex:1; min-width:280px; }
+  .equipHint{ font-size:12px; color: var(--muted); line-height:1.35; margin-top:6px; }
+  .equipChoices{ display:grid; grid-template-columns:repeat(3, minmax(110px, 1fr)); gap:12px; margin-top:12px; }
+  .equipCard{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px; border-radius:12px; border:1px solid rgba(45,212,255,.25); background: rgba(15,22,48,.6); color: var(--text); cursor:pointer; }
+  .equipCard:hover{ border-color: rgba(45,212,255,.65); }
+  .equipCard.active{ border-color: rgba(45,212,255,.95); box-shadow: 0 0 0 3px rgba(45,212,255,.12); }
+  .equipThumb{ width:76px; height:76px; object-fit:contain; background: rgba(11,16,32,.35); border-radius:10px; border:1px solid rgba(36,48,86,.6); padding:6px; }
+  .equipCard span{ font-size:12px; color: var(--muted); }
+  .equipImg{ width:340px; height:340px; border-radius:14px; border:1px solid var(--border); background: rgba(15,22,48,.6); object-fit:contain; padding:10px; }
+  @media (max-width:980px){
+    .equipChoices{ grid-template-columns:repeat(3, minmax(90px,1fr)); }
+    .equipImg{ width:260px; height:260px; }
+  }
+
+
+
+/* Checkbox row (Selecionar itens antes de exportar) */
+.checkWrap{ grid-column:1 / -1; }
+.checkLine{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background: rgba(15,22,48,.55);
+  cursor:pointer;
+  user-select:none;
+}
+.checkLine:hover{ border-color: rgba(45,212,255,.65); }
+:root[data-theme='light'] .checkLine{ background: rgba(241,242,244,.90); }
+.checkLine input{
+  width:18px;
+  height:18px;
+  margin:0;
+  accent-color: var(--primary);
+  flex: 0 0 auto;
+}
+.checkLine span{ color: var(--text); font-size:13px; }
+.checkHint{ display:block; margin-top:6px; margin-left:28px; }
+
+
+/* Equip carousel (auto, single) */
+.equipCarouselWrap{
+  width:100%;
+  height:360px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background: rgba(15,22,48,.6);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  margin-top:12px;
+}
+.equipCarouselImg{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  padding:10px;
+}
+/* Oculta as opções clicáveis (mantém no DOM para reaproveitar os data-src) */
+.equipChoices{ display:none !important; }
+
+
+/* Equip panel title centered */
+.equipPanel > .pn{
+  display:block;
+  width:100%;
+  text-align:center;
+}
+
+
+/* Visual polish pack */
+:root{
+  --focus: rgba(45,212,255,.22);
+}
+
+/* Dark: slightly higher contrast for muted text & borders */
+:root{
+  --muted: #b6c6e3;
+  --border: #2f3d6a;
+}
+
+/* Light (industrial): graphite header + clean cards */
+:root[data-theme="light"]{
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface2: #f4f6f9;
+  --text: #0b0f1a;
+  --muted: #3e4757;
+  --border: #cfd6e2;
+  --primary: #111827;
+  --primary2: #0f172a;
+  --good: #16a34a;
+  --bad: #dc2626;
+  --warn: #d97706;
+  --shadow: 0 12px 28px rgba(17,24,39,.12);
+}
+
+/* Backgrounds per theme */
+body{
+  background:
+    radial-gradient(900px 500px at 15% 0%, rgba(45,212,255,.12), transparent 60%),
+    radial-gradient(800px 420px at 90% 10%, rgba(96,165,250,.12), transparent 60%),
+    var(--bg);
+}
+:root[data-theme="light"] body{
+  background:
+    radial-gradient(900px 520px at 10% 0%, rgba(17,24,39,.06), transparent 60%),
+    radial-gradient(800px 420px at 90% 10%, rgba(17,24,39,.05), transparent 60%),
+    var(--bg);
+}
+
+/* Make sections breathe */
+.wrap{ padding: 26px; }
+.card .bd{ padding: 16px; }
+.card .hd{ padding: 14px 16px; }
+
+/* Inputs: better focus */
+select:focus, input:focus{
+  border-color: rgba(45,212,255,.85);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+:root[data-theme="light"] select:focus,
+:root[data-theme="light"] input:focus{
+  border-color: rgba(17,24,39,.55);
+  box-shadow: 0 0 0 3px rgba(17,24,39,.10);
+}
+
+/* Light theme: fix inputs/selects background (base CSS is dark) */
+:root[data-theme="light"] select,
+:root[data-theme="light"] input{
+  background: #ffffff;
+  color: var(--text);
+}
+
+/* Buttons: clearer hierarchy */
+.btn{
+  transition: transform .08s ease, border-color .15s ease, background .15s ease, opacity .15s ease;
+}
+.btn:active{ transform: translateY(1px); }
+.btn-ghost{ opacity: .92; }
+.btnPrimary{
+  background: linear-gradient(90deg, var(--primary), var(--primary2));
+  color: #fff;
+}
+
+/* Table readability: zebra + stronger header */
+.table thead th{ background: rgba(18,26,51,.98); }
+:root[data-theme="light"] .table thead th{
+  background: #111827;
+  color: rgba(255,255,255,.90);
+}
+.table tbody tr:nth-child(odd){ background: rgba(255,255,255,.02); }
+:root[data-theme="light"] .table tbody tr:nth-child(odd){ background: rgba(17,24,39,.03); }
+.table tbody tr:hover{ background: rgba(45,212,255,.08); }
+:root[data-theme="light"] .table tbody tr:hover{ background: rgba(17,24,39,.07); }
+
+/* Logo bar: readable in both themes */
+.logoBar{ padding: 18px 0 10px 0; background: transparent; }
+.logoPlate{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  box-shadow: 0 12px 30px rgba(0,0,0,.22);
+}
+:root[data-theme="light"] .logoPlate{
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(17,24,39,.10);
+}
+.logoPlate img{
+  max-width: 210px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.30));
+}
+:root[data-theme="light"] .logoPlate img{ filter: drop-shadow(0 6px 14px rgba(17,24,39,.18)); }
+
+
+
+/* Dark: logo mais forte */
+:root:not([data-theme="light"]) .logoPlate{
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.14),
+    rgba(255,255,255,.06)
+  );
+  border-color: rgba(45,212,255,.18);
+  box-shadow: 0 16px 46px rgba(0,0,0,.55);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+:root:not([data-theme="light"]) .logoPlate:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 18px 52px rgba(0,0,0,.60);
+}
+:root:not([data-theme="light"]) .logoPlate::after{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  background: radial-gradient(420px 120px at 50% 35%,
+    rgba(45,212,255,.22),
+    transparent 70%
+  );
+  pointer-events:none;
+}
+
+/* Dark: melhora contraste do logo (se o arquivo for escuro) */
+:root:not([data-theme="light"]) .logoPlate img{
+  filter: invert(1) brightness(1.05) drop-shadow(0 10px 22px rgba(45,212,255,.14));
+}
+/* Industrial light: make the top sticky bar graphite */
+:root[data-theme="light"] .topBar{
+  background: #111827 !important;
+  border-bottom: 1px solid rgba(17,24,39,.25) !important;
+}
+:root[data-theme="light"] .topBar .btn-ghost{
+  color: rgba(255,255,255,.90) !important;
+  border-color: rgba(255,255,255,.25) !important;
+}
+:root[data-theme="light"] .topBar .btn-ghost:hover{
+  border-color: rgba(255,255,255,.45) !important;
+}
+
+/* Light theme: cards less translucent to look cleaner */
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .header{
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(8px);
+}
+
+/* Light theme: modal must also be light (base modal is dark) */
+:root[data-theme="light"] .modalCard{
+  background: rgba(255,255,255,.96);
+}
+:root[data-theme="light"] .modalHd{
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="light"] .xBtn{
+  color: rgba(17,24,39,.80);
+  border-color: rgba(17,24,39,.25);
+}
+:root[data-theme="light"] .xBtn:hover{
+  border-color: rgba(17,24,39,.45);
+}
+:root[data-theme="light"] .checkLine{
+  background: rgba(255,255,255,.92);
+}
+
+
+/* Light theme: fix dark blocks */
+:root[data-theme="light"] .pill{
+  background: rgba(255,255,255,.92);
+  color: var(--muted);
+}
+:root[data-theme="light"] .dot.idle{ background: var(--warn); }
+:root[data-theme="light"] .dot.ok{ background: var(--good); }
+:root[data-theme="light"] .dot.err{ background: var(--bad); }
+
+:root[data-theme="light"] .upload{
+  border-color: rgba(17,24,39,.22);
+  background: linear-gradient(180deg, rgba(17,24,39,.03), rgba(255,255,255,.92));
+}
+:root[data-theme="light"] .upload:hover{
+  border-color: rgba(17,24,39,.35);
+}
+:root[data-theme="light"] .upload.drag{
+  border-color: rgba(17,24,39,.55);
+  background: rgba(255,255,255,.96);
+}
+
+:root[data-theme="light"] .metric{
+  background: rgba(255,255,255,.96);
+}
+
+:root[data-theme="light"] .equipCarouselWrap{
+  background: rgba(255,255,255,.96);
+}
+
+
+/* Chart selection checkbox (Peças) */
+.chartItemChk{ width:18px; height:18px; cursor:pointer; accent-color: var(--primary); }
+</style>
+
+  <!-- PDF Export libs -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div style=\"position:sticky;top:0;z-index:9999;display:flex;justify-content:flex-end;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);\"><button id="btnToggleTheme" class="btn btn-ghost" type="button" title="Alternar tema">Tema: Escuro</button></div>
+  
+  <!-- Logo Nors -->
+<div class="logoBar" style="text-align:center;">
+  <div class="logoPlate">
+    <img src="https://nors.basepro.net/relatorios/img/Nors.png" alt="Nors Logo">
+  </div>
+</div>
+<div class="wrap">
+    <div class="header">
+      <div class="title">
+        <h1>Dashboard de Manutenção / Acordo de manutenção</h1>
+</div>
+      <div class="status">
+        <span class="pill"><span class="dot idle" id="statusDot"></span><span id="statusText">Aguardando arquivo...</span></span>
+<span class="pill">Preços carregados: <b id="priceCount">0</b></span>
+</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="hd">
+          <h2>Carregar e filtrar</h2>
+          <div class="toolbar">
+            <button class="btn" id="btnMaintenance" type="button">Cadastrar proposta</button>
+<button class="btn" id="btnClear" type="button">Limpar</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="upload" id="dropZone">
+            <strong>Clique para selecionar</strong> ou arraste o arquivo aqui
+            <small>Aceita .xlsx, .xls e .csv</small>
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
+          </div>
+
+          <div class="upload" id="priceDropZone">
+            <strong>Carregar tabela de preços</strong> ou arraste o arquivo aqui
+            <small>Colunas: Referencia (Part number) e Preço. Aceita .xlsx, .xls e .csv</small>
+            <input id="priceInput" type="file" accept=".xlsx,.xls,.csv" />
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="controls">
+            <div>
+              <label>Modelo</label>
+              <select id="modelSelect"><option value="">-- Todos --</option></select>
+            </div>
+            <div>
+              <label>Intervalo (Horas)</label>
+              <select id="hoursSelect"><option value="">-- Todos --</option></select>
+            </div>
+            <div>
+              <label>Buscar (opcional)</label>
+              <input id="searchInput" placeholder="Filtro, Óleo, 17533661..." />
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="metrics">
+            <div class="metric"><div class="k">Registros (linhas)</div><div class="v" id="mRows">0</div></div>
+            <div class="metric"><div class="k">Modelos únicos</div><div class="v" id="mModels">0</div></div>
+            <div class="metric"><div class="k">Quantidade total (filtro)</div><div class="v" id="mQty">0</div></div>
+            <div class="metric"><div class="k">Custo total (filtro)</div><div class="v" id="mCost">R$ 0,00</div></div>
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="note">
+            Colunas esperadas: <span class="pn">Modelo</span>, <span class="pn">Part number</span>, <span class="pn">Descrição</span>, <span class="pn">Qtd</span> e colunas de horas (ex.: <span class="pn">500</span>, <span class="pn">1000</span>...).
+          </div>
+
+          <div class="equipWrap">
+            <div class="equipPanel">
+              <div><span class="pn">Modelos</span></div>
+<div class="equipCarouselWrap" id="equipCarouselWrap">
+    <img id="equipCarouselImg" class="equipCarouselImg" alt="Equipamento">
+  </div>
+<div class="equipChoices" id="equipChoices">
+                <button class="equipCard" type="button" data-equip="excavator" data-src="https://www.volvoce.com/-/media/aprimo/images/crawler-excavators/ec230/volvo-find-crawler-excavator-ec230f-t3-1000x1000-2.avif?mw=512&v=b4J4Pw&f=avif&q=64&hash=89970DFB0C1C3CA0D43F896F2AEBEA2F">
+                  <img class="equipThumb" alt="Escavadeira" src="https://www.volvoce.com/-/media/aprimo/images/crawler-excavators/ec230/volvo-find-crawler-excavator-ec230f-t3-1000x1000-2.avif?mw=512&v=b4J4Pw&f=avif&q=64&hash=89970DFB0C1C3CA0D43F896F2AEBEA2F" />
+                  <span>Escavadeira</span>
+                </button>
+                <button class="equipCard" type="button" data-equip="loader" data-src="https://www.tracbel.com.br/wp-content/uploads/2024/01/Pa-Carregadeira-Volvo-L60H-1.jpg">
+                  <img class="equipThumb" alt="Carregadeira" src="https://www.tracbel.com.br/wp-content/uploads/2024/01/Pa-Carregadeira-Volvo-L60H-1.jpg" />
+                  <span>Carregadeira</span>
+                </button>
+                <button class="equipCard" type="button" data-equip="articulated" data-src="https://www.volvoce.com/-/media/aprimo/images/articulated-haulers/a60/volvo-articulated-hauler-a60j-1000x1000.avif?mw=512&v=d4J4Pw&f=avif&q=64&hash=29D427A40AC04CBAE57252BB13D4DFF4">
+                  <img class="equipThumb" alt="Articulado" src="https://www.volvoce.com/-/media/aprimo/images/articulated-haulers/a60/volvo-articulated-hauler-a60j-1000x1000.avif?mw=512&v=d4J4Pw&f=avif&q=64&hash=29D427A40AC04CBAE57252BB13D4DFF4" />
+                  <span>Articulado</span>
+                </button>
+              </div>
+            </div>
+</div>
+
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd"><h2>Peças</h2></div>
+        <div class="bd" style="max-height:440px; overflow:auto">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style=\"width:44px;text-align:center\">Gráfico</th><th>Peça/Descrição</th>
+                <th>Part number</th>
+                <th>Horas</th>
+                <th>Quantidade</th>
+                <th>Preço (un)</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="summaryBody">
+              <tr><td colspan="7" class="note">Carregue um arquivo para visualizar.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="hd" style="border-top:1px solid var(--border)"><h2>Relação - Item x Valor</h2></div>
+        <div class="bd">
+          <div class="chartWrap"><canvas id="chartByType"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <div class="card">
+      <div class="hd"><h2>Lista de itens</h2></div>
+      <div class="bd">
+        <div class="note" id="bigTableHint" style="margin-bottom:10px; display:none;">A lista pode ficar longa dependendo do filtro (sem rolagem, como solicitado).</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Modelo</th>
+              <th>Descrição</th>
+              <th>Part number</th>
+              <th>Horas</th>
+              <th>Quantidade</th>
+              <th>Preço (un)</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="detailBody">
+            <tr><td colspan="7" class="note">Carregue um arquivo para visualizar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="maintModal" aria-hidden="true">
+    <div class="modalCard">
+      <div class="modalHd">
+        <h3>Cadastro de proposta</h3>
+        <div class="toolbar">
+          <button class="xBtn" id="btnCloseModal" type="button">Fechar</button>
+        </div>
+      </div>
+      <div class="modalBd">
+        <div class="note" style="margin-bottom:10px">Esta tela gera uma proposta com base no modelo + horas inicial/final e na tabela de preços carregada.</div>
+
+        <div class="small" style="margin:10px 0 6px">Dados do cliente</div>
+        <div class="formGrid">
+          <div>
+            <label>Nome do cliente</label>
+            <input id="pClientName" placeholder="Nome do cliente" />
+          </div>
+          <div>
+            <label>Telefone</label>
+            <input id="pClientPhone" placeholder="(67) 9xxxx-xxxx" inputmode="tel" />
+          </div>
+          <div>
+            <label>E-mail</label>
+            <input id="pClientEmail" type="email" placeholder="cliente@empresa.com" />
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="small" style="margin:10px 0 6px">Dados da máquina</div>
+        <div class="formGrid">
+          <div>
+            <label>Modelo (para filtrar os dados)</label>
+            <select id="pModel"></select>
+          </div>
+          <div>
+            <label>Cidade</label>
+            <input id="pCity" placeholder="Dourados" />
+          </div>
+          <div>
+            <label>Horas: Inicial</label>
+            <input id="pHIni" type="number" min="0" step="1" placeholder="0" />
+          </div>
+          <div>
+            <label>Horas: Final</label>
+            <input id="pHFim" type="number" min="0" step="1" placeholder="2000" />
+          </div>
+          <div>
+            <label>Taxa de atendimento (R$)</label>
+            <input id="pFee" type="number" min="0" step="0.01" placeholder="0,00" />
+          </div>
+          <div>
+            <label>Atendimentos (quantas vezes)</label>
+            <input id="pFeeTimes" type="number" min="0" step="1" />
+            <small class="small">Valor adicionado ao total: taxa × vezes.</small>
+          </div>
+<div>
+  <div class="checkWrap">
+  <label class="checkLine" for="pSelectItemsMode">
+    <input id="pSelectItemsMode" type="checkbox">
+    <span>Selecionar itens antes de exportar (PDF)</span>
+  </label>
+  <small class="small checkHint">Se marcado, será exibida uma lista para marcar/desmarcar itens antes de gerar o PDF.</small>
+
+        <label class="checkLine" for="pIncludeTimestamp">
+          <input id="pIncludeTimestamp" type="checkbox" checked>
+          <span>Incluir timestamp ("Emitido em...") no PDF</span>
+        </label>
+        <small class="small checkHint">Se desmarcado, o PDF será gerado sem a linha de emissão (layout preservado).</small>
+</div>
+
+<label>Troca de óleo hidráulico (tempo padrão)</label>
+  <select id="pHydOpt">
+    <option value="2000" selected>Tempo padrão Troca de óleo Hidráulico 2000 hs</option>
+    <option value="4000">Tempo padrão Troca de óleo Hidráulico 4000 hs</option>
+    <option value="5000">Tempo padrão Troca de óleo Hidráulico 5000 hs</option>
+  </select>
+  <small class="small">Escolha apenas uma opção (evita duplicar o item de óleo hidráulico).</small>
+</div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="formGrid">
+<div style="grid-column:1/-1">
+            <label>Condição de pagamento</label>
+            <input id="pPayCond" placeholder="Ex.: 30 dias / 2x / à vista..." />
+          </div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="toolbar">
+          <button class="btn" id="btnExportPDF" type="button">Exportar PDF</button></div>
+
+        <div style="height:10px"></div>
+        <div style="height:12px"></div>
+        <div class="note" id="maintMsg" style="display:none"></div>
+
+        <div style="height:12px"></div>
+        <div id="maintListWrap" style="display:none">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Cliente</th>
+                <th>Modelo</th>
+                <th>Horas</th>
+                <th>Total</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="maintList"></tbody>
+          </table>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+
+
+<!-- Modal: Seleção de Itens do PDF -->
+<div class="modal" id="selectItemsModal" aria-hidden="true">
+  <div class="modalCard" style="width:min(980px, 100%);">
+    <div class="modalHd">
+      <h3>Selecione os itens para exportar</h3>
+      <div class="toolbar">
+        <button class="btn btn-ghost" type="button" id="btnSelAll">Marcar tudo</button>
+        <button class="btn btn-ghost" type="button" id="btnSelNone">Desmarcar tudo</button>
+        <button class="xBtn" type="button" id="btnSelClose">Fechar</button>
+      </div>
+    </div>
+    <div class="modalBd">
+      <div class="note" style="margin-bottom:10px;">Desmarque os itens que não devem entrar no PDF. O total do PDF será recalculado com base na seleção.</div>
+      <div style="max-height:52vh; overflow:auto; border:1px solid var(--border); border-radius:12px;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:40px; text-align:center;"><input type="checkbox" id="chkSelAll" checked /></th>
+              <th>Descrição</th>
+              <th style="width:140px;">Part number</th>
+              <th style="width:90px; text-align:right;">Qtd</th>
+              <th style="width:110px; text-align:right;">Preço un</th>
+              <th style="width:120px; text-align:right;">Total</th>
+            </tr>
+          </thead>
+          <tbody id="selItemsBody">
+            <tr><td colspan="7" class="note">Nenhum item.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="toolbar" style="justify-content:flex-end; padding:12px 14px; border-top:1px solid var(--border);">
+      <button class="btn" type="button" id="btnSelCancel">Cancelar</button>
+      <button class="btn btnPrimary" type="button" id="btnSelConfirm">Confirmar e Exportar PDF</button>
+    </div>
+  </div>
+</div>
+<script>
+'use strict';
+
+// Debounce para evitar render pesado a cada tecla
+let __renderTimer = null;
+function scheduleRender(){
+  clearTimeout(__renderTimer);
+  __renderTimer = setTimeout(render, 180);
+}
+
+
+// =============== Dashboard data ===============
+let allData = [];
+let charts = { byType: null };
+
+// =============== Price list (Part number -> preço) ===============
+let priceMap = new Map();
+
+// PDF item selection (somente para exportação)
+let pdfSelKeys = null; // Set de chaves selecionadas (pn|desc)
+let pdfSelBuilt = null; // Cache do buildProposalItems para a seleção
+let pdfSelEdits = null
+
+// Chart item selection (Peças -> Relação - Item x Valor)
+let chartSelKeys = null;
+let lastSummaryForChart = [];
+let lastHoursForChart = '';
+let lastChartModel = '';
+
+; // Map key -> {desc, qty}
+
+const PRICEKEY = 'priceList_v1';
+
+function normRef(x){
+  return String((x === undefined || x === null) ? '' : x).trim().toUpperCase();
+}
+
+// Converte PN vindo como Number (Excel) para texto sem notação científica quando possível
+function pnToText(v){
+  if (v === undefined || v === null) return '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) return '';
+    // Inteiros até MAX_SAFE_INTEGER são representáveis com segurança no JS
+    if (Number.isInteger(v) && Math.abs(v) <= Number.MAX_SAFE_INTEGER) return String(v);
+    // Fallback: tenta converter exponencial p/ string (pode não ser exato se já perdeu precisão)
+    try {
+      const s = v.toString();
+      if (!/e\+/i.test(s)) return s;
+      const m = s.match(/^(-?)(\d+(?:\.\d+)?)e\+?(\d+)$/i);
+      if (!m) return s;
+      const sign = m[1];
+      let num = m[2].replace('.', '');
+      const exp = parseInt(m[3], 10);
+      const zeros = Math.max(0, exp - (num.length - 1));
+      return sign + num + '0'.repeat(zeros);
+    } catch(e){
+      return String(v);
+    }
+  }
+  return String(v).trim();
+}
+
+
+function updatePriceCount(){
+  const el = document.getElementById('priceCount');
+  if (el) el.textContent = String(priceMap.size);
+}
+
+function getPrices(){
+  try { return JSON.parse(localStorage.getItem(PRICEKEY)) || []; }
+  catch(e) { return []; }
+}
+
+function setPrices(arr){
+  localStorage.setItem(PRICEKEY, JSON.stringify(arr || []));
+  rebuildPriceMap();
+}
+
+function parseMoney(v){
+  const s = String((v === undefined || v === null) ? '' : v).trim();
+  if (!s) return 0;
+  let t = s.replace(/[^\d,.-]/g, '');
+  if (t.indexOf(',') >= 0 && t.indexOf('.') >= 0){
+    t = t.replaceAll('.', '').replace(',', '.');
+  } else {
+    t = t.replace(',', '.');
+  }
+  const n = Number(t);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmtBRL(n){
+  return Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function normalizePriceRow(row){
+  const out = {};
+  for (const k in row) out[String(k).trim()] = row[k];
+
+  const keyNorm = (k) =>
+    String(k).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+
+  const refKey = Object.keys(out).find(k =>
+    ['referencia','ref','part number','partnumber','codigo','code'].includes(keyNorm(k))
+  );
+
+  const priceKey = Object.keys(out).find(k =>
+    ['preco','preco unitario','valor','price'].includes(keyNorm(k))
+  );
+
+  return { Referencia: out[refKey], Preco: out[priceKey] };
+}
+
+function rebuildPriceMap(){
+  priceMap = new Map();
+  const list = getPrices();
+  for (const r of list){
+    const ref = normRef(r.Referencia);
+    if (!ref) continue;
+    const p = parseMoney(r.Preco);
+    if (!p) continue;
+    priceMap.set(ref, p);
+  }
+  updatePriceCount();
+}
+
+async function loadPriceFile(file){
+  setStatus('idle','Lendo tabela de preços...');
+  let rows = [];
+
+  try {
+    const name = String((file && file.name) ? file.name : '').toLowerCase();
+
+    if (name.endsWith('.csv')){
+      const textUtf8 = await file.text();
+      rows = parseCSV(textUtf8);
+
+      if (!rows.length){
+        const textLatin = await readFileAsText(file, 'ISO-8859-1');
+        rows = parseCSV(textLatin);
+      }
+
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')){
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+    } else {
+      throw new Error('Formato não suportado para preços. Use .xlsx/.xls/.csv');
+    }
+
+    if (!rows.length) throw new Error('Tabela de preços vazia.');
+
+    const normalized = rows
+      .map(normalizePriceRow)
+      .filter(r => String((r.Referencia === undefined || r.Referencia === null) ? '' : r.Referencia).trim().length);
+
+    if (!normalized.length) throw new Error('Não encontrei coluna Referencia/Part number.');
+
+    setPrices(normalized);
+    setStatus('ok', 'Preços carregados: ' + priceMap.size);
+    render();
+
+  } catch (e){
+    setStatus('err', 'Erro preços: ' + (((e && e.message) ? e.message : e)));
+  }
+}
+
+
+function setStatus(kind, text){
+  const dot = document.getElementById('statusDot');
+  const st = document.getElementById('statusText');
+  dot.className = 'dot ' + (kind === 'ok' ? 'ok' : kind === 'err' ? 'err' : 'idle');
+  st.textContent = text;
+}
+
+function detectDelimiter(line){
+  const semi = line.split(';').length - 1;
+  const comma = line.split(',').length - 1;
+  return semi > comma ? ';' : ',';
+}
+
+function parseCSV(text){
+  if (!text) return [];
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+const lines = text.split('\n').filter(l => l.trim().length);
+  if (!lines.length) return [];
+
+  const delim = detectDelimiter(lines[0]);
+
+  function parseLine(line){
+    const out = [];
+    let cur = '';
+    let inQuotes = false;
+
+    for (let i=0;i<line.length;i++){
+      const ch = line[i];
+      if (ch === '"'){
+        if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (ch === delim && !inQuotes){
+        out.push(cur);
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out.map(v => v.trim());
+  }
+
+  const headers = parseLine(lines[0]).map(h => h.trim());
+  const rows = [];
+  for (let i=1;i<lines.length;i++){
+    const values = parseLine(lines[i]);
+    const row = {};
+    headers.forEach((h, idx) => row[h] = values[idx] ?? '');
+    rows.push(row);
+  }
+  return rows;
+}
+
+function normalizeRow(row){
+  const out = {};
+  for (const k in row){
+    out[String(k).trim()] = row[k];
+  }
+  if (out['Part Number'] !== undefined && out['Part number'] === undefined) out['Part number'] = out['Part Number'];
+  if (out['PART NUMBER'] !== undefined && out['Part number'] === undefined) out['Part number'] = out['PART NUMBER'];
+  if (out['Descricao'] !== undefined && out['Descrição'] === undefined) out['Descrição'] = out['Descricao'];
+  if (out['DESCRIÇÃO'] !== undefined && out['Descrição'] === undefined) out['Descrição'] = out['DESCRIÇÃO'];
+  for (const k in out){
+    if (out[k] === undefined || out[k] === null) out[k] = '';
+  }
+    // Garantir que Part number fique como texto (evita 4,11E+12)
+  if (out['Part number'] !== undefined) out['Part number'] = pnToText(out['Part number']);
+
+  return out;
+}
+
+function normalizeDataset(rows){
+  return (rows || []).map(normalizeRow);
+}
+
+function readFileAsText(file, encoding){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
+    reader.readAsText(file, encoding);
+  });
+}
+
+async function loadFile(file){
+  setStatus('idle','Lendo arquivo...');
+  const name = (file.name || '').toLowerCase();
+  let rows = [];
+
+  try{
+    if (name.endsWith('.csv')){
+      const textUtf8 = await file.text();
+      rows = parseCSV(textUtf8);
+      if (!rows.length){
+        const textLatin = await readFileAsText(file, 'ISO-8859-1');
+        rows = parseCSV(textLatin);
+      }
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')){
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    } else {
+      throw new Error('Formato não suportado. Use .xlsx/.xls/.csv');
+    }
+
+    rows = normalizeDataset(rows);
+    if (!rows.length) throw new Error('Arquivo carregou, mas veio vazio.');
+
+    const sample = rows[0];
+    const need = ['Modelo','Part number','Descrição','Qtd'];
+    const missing = need.filter(k => !(k in sample));
+    if (missing.length) throw new Error('Colunas ausentes: ' + missing.join(', '));
+
+    allData = rows;
+    populateFilters();
+    render();
+    setStatus('ok', 'OK: ' + allData.length.toLocaleString() + ' linhas carregadas (' + file.name + ')');
+  } catch (e){
+    console.error(e);
+    allData = [];
+    populateFilters();
+    render();
+    setStatus('err', 'Erro: ' + ((e && e.message) ? e.message : e));
+  }
+}
+
+function populateFilters(){
+  const modelSelect = document.getElementById('modelSelect');
+  const hoursSelect = document.getElementById('hoursSelect');
+
+  modelSelect.innerHTML = '<option value="">-- Todos --</option>';
+  hoursSelect.innerHTML = '<option value="">-- Todos --</option>';
+
+  const models = [...new Set(allData.map(r => r['Modelo']).filter(v => v && String(v).trim().length))].sort();
+  for (const m of models){
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    modelSelect.appendChild(opt);
+  }
+
+  // horas = chaves numéricas
+  if (allData.length){
+    const keys = Object.keys(allData[0]);
+    const hourNums = keys
+      .map(k => String(k).trim())
+      .map(k => ({ k, n: Number(k) }))
+      .filter(x => Number.isFinite(x.n) && String(x.n) === x.k)
+      .map(x => x.n)
+      .sort((a,b) => a-b);
+
+    for (const n of hourNums){
+      const opt = document.createElement('option');
+      opt.value = String(n);
+      opt.textContent = String(n) + ' horas';
+      hoursSelect.appendChild(opt);
+    }
+  }
+
+  document.getElementById('mRows').textContent = (allData.length || 0).toLocaleString();
+  document.getElementById('mModels').textContent = (models.length || 0).toLocaleString();
+}
+
+function getFiltered(){
+  const model = document.getElementById('modelSelect').value;
+  const hours = document.getElementById('hoursSelect').value;
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  return allData.filter(r => {
+    if (model && String(r['Modelo']) !== model) return false;
+    if (search){
+      const d = String(r['Descrição'] || '').toLowerCase();
+      const pn = String(r['Part number'] || '').toLowerCase();
+      if (!d.includes(search) && !pn.includes(search)) return false;
+    }
+    if (hours){
+      const v = r[hours];
+      if (v === '' || v === 0 || v === '0' || v === null || v === undefined) return false;
+    }
+    return true;
+  });
+}
+
+function num(x){
+  const n = Number(String(x ?? '0').replace(',', '.'));
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function render(){
+  const hydOpt = String(document.getElementById('pHydOpt')?.value || '2000');
+  const filtered = getFiltered();
+  const hours = document.getElementById('hoursSelect').value;
+
+  document.getElementById('bigTableHint').style.display = (filtered.length > 500 ? 'block' : 'none');
+
+  let totalQty = 0;
+  for (const r of filtered){
+    totalQty += hours ? num(r[hours]) : num(r['Qtd']);
+  }
+  document.getElementById('mQty').textContent = totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+  let totalCost = 0;
+
+  // Peças (agregado)
+  const agg = new Map();
+  for (const r of filtered){
+    const desc = String((r['Descrição'] === undefined || r['Descrição'] === null) ? '' : r['Descrição']).trim();
+      /*HYD_FILTER*/
+      const _desc = String(r['Descrio'] ?? r['Descrição'] ?? r['Descricao'] ?? '').toLowerCase();
+      if (_desc.includes('hidraul') && _desc.includes('oleo')) {
+        if (hydOpt === '2000' && _desc.includes('5000')) continue;
+        if (hydOpt === '5000' && _desc.includes('2000')) continue;
+      }
+    const pn = String((r['Part number'] === undefined || r['Part number'] === null) ? '' : r['Part number']).trim();
+    const key = pn + '||' + desc;
+    const qty = hours ? num(r[hours]) : num(r['Qtd']);
+    const unit = (priceMap && priceMap.get(normRef(pn))) ? priceMap.get(normRef(pn)) : 0;
+    if (!agg.has(key)) agg.set(key, { key, desc, pn, qty: 0, unit });
+    agg.get(key).qty += qty;
+  }
+
+  const summary = [...agg.values()].sort((a,b) => b.qty - a.qty);
+  for (const it of summary){
+    if (it.unit) totalCost += it.unit * it.qty;
+  }
+
+  const mCost = document.getElementById('mCost');
+  if (mCost) mCost.textContent = hours ? fmtBRL(totalCost) : '—';
+
+  const sb = document.getElementById('summaryBody');
+
+  if (!allData.length){
+    sb.innerHTML = '<tr><td colspan="7" class="note">Carregue um arquivo para visualizar.</td></tr>';
+  } else if (!hours){
+    sb.innerHTML = '<tr><td colspan="7" class="note">Selecione um intervalo de horas para preencher Quantidade.</td></tr>';
+  } else if (!summary.length){
+    sb.innerHTML = '<tr><td colspan="7" class="note">Nenhum item encontrado para o filtro atual.</td></tr>';
+  } else {
+    sb.innerHTML = summary.slice(0, 120).map(it => {
+      const unitTxt = it.unit ? fmtBRL(it.unit) : '—';
+      const totTxt = it.unit ? fmtBRL(it.unit * it.qty) : '—';
+      return (
+        '<tr>'+
+          '<td style=\"text-align:center\">' +
+            '<input class=\"chartItemChk\" type=\"checkbox\" data-key=\"' + esc(it.key) + '\" ' + ((chartSelKeys && chartSelKeys.has(it.key)) ? 'checked' : '') + '>' +
+          '</td>' +
+          '<td>' + esc(it.desc) + '</td>'+
+          '<td><span class="pn">' + esc(it.pn) + '</span></td>'+
+          '<td>' + esc(hours) + '</td>'+
+          '<td>' + it.qty.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'+
+          '<td>' + unitTxt + '</td>'+
+          '<td>' + totTxt + '</td>'+
+        '</tr>'
+      );
+    }).join('') + (summary.length > 120 ? '<tr><td colspan="7" class="note">... e mais ' + (summary.length-120) + ' itens.</td></tr>' : '');
+  }
+
+  // Lista de itens
+  const db = document.getElementById('detailBody');
+  if (!allData.length){
+    db.innerHTML = '<tr><td colspan="7" class="note">Carregue um arquivo para visualizar.</td></tr>';
+  } else if (!hours){
+    db.innerHTML = '<tr><td colspan="7" class="note">Selecione um intervalo de horas para preencher a coluna Quantidade.</td></tr>';
+  } else if (!filtered.length){
+    db.innerHTML = '<tr><td colspan="7" class="note">Nenhum dado para o filtro atual.</td></tr>';
+  } else {
+    db.innerHTML = (function(){
+  const MAX_DETAIL_ROWS = 800;
+  const shown = filtered.slice(0, MAX_DETAIL_ROWS);
+  const rowsHtml = shown.map(r => {
+      const pn = String((r['Part number'] === undefined || r['Part number'] === null) ? '' : r['Part number']).trim();
+      const qty = num(r[hours]);
+      const unit = (priceMap && priceMap.get(normRef(pn))) ? priceMap.get(normRef(pn)) : 0;
+      const tot = unit ? (unit * qty) : 0;
+      return (
+        '<tr>'+
+          '<td>' + esc(r['Modelo']) + '</td>'+
+          '<td>' + esc(r['Descrição']) + '</td>'+
+          '<td><span class="pn">' + esc(pn) + '</span></td>'+
+          '<td>' + esc(hours) + '</td>'+
+          '<td>' + qty.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'+
+          '<td>' + (unit ? fmtBRL(unit) : '—') + '</td>'+
+          '<td>' + (unit ? fmtBRL(tot) : '—') + '</td>'+
+        '</tr>'
+      );
+    }).join('');
+  const moreHtml = (filtered.length > MAX_DETAIL_ROWS) ? `
+<tr><td colspan=\"7\" class=\"note\">Mostrando ${MAX_DETAIL_ROWS} de ${filtered.length} itens (use filtro/busca para reduzir).</td></tr>` : '';
+  return rowsHtml + moreHtml;
+})();
+  }
+
+  // Gráfico: Relação Item x Valor (Top 10) — usando Part number
+  // Gráfico (seleção via checkbox em Peças)
+  lastSummaryForChart = summary;
+  lastHoursForChart = hours;
+
+  const modelNow = String(document.getElementById('modelSelect')?.value || '');
+
+  // Quando trocar o modelo, marca todos os checkboxes automaticamente
+  if (modelNow !== lastChartModel){
+    chartSelKeys = new Set(summary.map(it => it.key));
+    lastChartModel = modelNow;
+  } else {
+    // Mantém seleção atual, mas garante que itens novos entrem marcados
+    if (!chartSelKeys) chartSelKeys = new Set(summary.map(it => it.key));
+    else for (const it of summary) if (!chartSelKeys.has(it.key)) chartSelKeys.add(it.key);
+  }
+
+  renderChart(summary, hours);
+
+}
+
+
+
+function renderChart(summary, hours){
+  const ctxEl = document.getElementById('chartByType');
+  if (!ctxEl) return;
+  const ctx = ctxEl.getContext('2d');
+
+  // Chart theme (font + colors follow current theme)
+  const fontFamily = getComputedStyle(document.body).fontFamily;
+  const rootStyle = getComputedStyle(document.documentElement);
+  const tickColor = (rootStyle.getPropertyValue('--muted') || '').trim() || '#9fb0d0';
+  const gridColor = (document.documentElement.getAttribute('data-theme') === 'light')
+    ? 'rgba(17,24,39,.12)'
+    : 'rgba(231,238,252,.08)';
+
+  if (!hours || !summary || !summary.length){
+    if (charts.byType) charts.byType.destroy();
+    charts.byType = new Chart(ctx, {
+      type:'bar',
+      data:{labels:[], datasets:[{data:[]}]},
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{ legend:{ display:false } },
+        scales:{
+          y:{ beginAtZero:true, grid:{ color: gridColor }, ticks:{ color: tickColor, font:{ family: fontFamily, size: 11 } } },
+          x:{ grid:{ display:false }, ticks:{ color: tickColor, font:{ family: fontFamily, size: 11 } } }
+        }
+      }
+    });
+    return;
+  }
+
+  const selected = summary
+    .filter(it => chartSelKeys && chartSelKeys.has(it.key))
+    .map(it => ({
+      label: (it.pn && String(it.pn).trim().length) ? String(it.pn).trim() : String(it.desc||'').trim(),
+      value: (it.unit ? it.unit : 0) * (it.qty ? it.qty : 0)
+    }))
+    .filter(x => x.value > 0);
+
+  const top = selected.sort((a,b)=>b.value-a.value).slice(0,10);
+  const labels = top.map(x => (x.label.length > 18 ? x.label.slice(0,18)+'…' : x.label));
+  const vals = top.map(x => x.value);
+
+  if (charts.byType) charts.byType.destroy();
+  charts.byType = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ data: vals, backgroundColor:'rgba(45,212,255,.75)', borderColor:'rgba(45,212,255,1)', borderWidth:1, borderRadius:10 }] },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: c => fmtBRL(c.raw) }, titleFont:{ family: fontFamily, size: 12 }, bodyFont:{ family: fontFamily, size: 12 } } },
+      scales:{
+        y:{ beginAtZero:true, grid:{ color: gridColor }, ticks:{ color: tickColor, font:{ family: fontFamily, size: 11 } } },
+        x:{ grid:{ display:false }, ticks:{ color: tickColor, font:{ family: fontFamily, size: 11 } } }
+      }
+    }
+  });
+}
+
+
+
+    function getIncludeTimestamp(){
+      const el = document.getElementById('pIncludeTimestamp');
+      return el ? !!el.checked : true;
+    }
+function safeClient(x){ return esc(x); }
+function safeFileName(s){
+  return String(s||'Cliente').trim().replace(/[\/\\?%*:|\"<>]/g,'-');
+}
+function esc(x){
+  return String(x ?? '')
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#039;');
+}
+
+
+
+function fillProposalModels(){
+  const pm = document.getElementById('pModel');
+  const src = document.getElementById('modelSelect');
+  if (!pm || !src) return;
+
+  pm.innerHTML = '';
+  Array.from(src.options).forEach(o => {
+    if (String(o.value).toLowerCase() === 'all') return;
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.textContent;
+    pm.appendChild(opt);
+  });
+}
+
+function getHourColumnsFromData(){
+  if (!allData || !allData.length) return [];
+  const keys = Object.keys(allData[0] || {});
+  return keys
+    .map(k => ({ k, n: Number(String(k).trim()) }))
+    .filter(x => Number.isFinite(x.n))
+    .sort((a,b) => a.n - b.n);
+}
+
+function calcProposal() {
+  const hydOpt = String(document.getElementById('pHydOpt')?.value || '2000');
+  const model = String(document.getElementById('pModel') ? document.getElementById('pModel').value : '').trim();
+  const hIni = Number(document.getElementById('pHIni') ? document.getElementById('pHIni').value : 0);
+  const hFim = Number(document.getElementById('pHFim') ? document.getElementById('pHFim').value : 0);
+  const fee = Number(document.getElementById('pFee') ? document.getElementById('pFee').value : 0);
+  const feeTimes = Number(document.getElementById('pFeeTimes') ? document.getElementById('pFeeTimes').value : 0);
+
+  const outTotal = document.getElementById('pTotal');
+  const outCH = document.getElementById('pCostHour');
+
+  if (!outTotal || !outCH){
+    return;
+  }
+
+  if (!model || !allData.length || !priceMap || !priceMap.size){
+    outTotal.value = '—';
+    outCH.value = '—';
+    return;
+  }
+
+  const lo = Math.min(hIni, hFim);
+  const hi = Math.max(hIni, hFim);
+
+  const hoursCols = getHourColumnsFromData().filter(x => x.n >= lo && x.n <= hi);
+
+  const rows = allData.filter(r => String((r['Modelo'] === undefined || r['Modelo'] === null) ? '' : r['Modelo']).trim() === model);
+
+  let total = 0;
+  for (const hc of hoursCols){
+    for (const r of rows){
+      const pn = String((r['Part number'] === undefined || r['Part number'] === null) ? '' : r['Part number']).trim();
+      const qty = num(r[hc.k]);
+      const unit = priceMap.get(normRef(pn)) || 0;
+      total += unit * qty;
+    }
+  }
+
+  // Taxa de atendimento: valor x quantidade informada
+  total += (fee * feeTimes);
+
+  const horasPeriodo = (hi - lo) || 0;
+  const custoHora = horasPeriodo > 0 ? (total / horasPeriodo) : 0;
+
+  outTotal.value = fmtBRL(total);
+  outCH.value = fmtBRL(custoHora);
+}
+// =============== Maintenance records (localStorage) ===============
+const MAINT_KEY = 'proposalRecords_v1';
+
+function getMaint(){
+  try { return JSON.parse(localStorage.getItem(MAINT_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+
+function setMaint(arr){
+  localStorage.setItem(MAINT_KEY, JSON.stringify(arr));
+  updateMaintCount();
+}
+
+function updateMaintCount(){
+  const el = document.getElementById('maintCount');
+  if (el) el.textContent = String(getMaint().length);
+}
+
+function showMaintMsg(text){
+  const el = document.getElementById('maintMsg');
+  el.textContent = text;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+function renderMaintList(){
+  const wrap = document.getElementById('maintListWrap');
+  const body = document.getElementById('maintList');
+  const list = getMaint().sort((a,b) => (b.id||0) - (a.id||0));
+
+  wrap.style.display = 'block';
+  if (!list.length){
+    body.innerHTML = '<tr><td colspan="7" class="note">Nenhuma proposta salva.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.map(r => (
+    '<tr>'+
+      '<td>' + esc(r.date || '') + '</td>'+
+      '<td>' + esc((r.clientName || '')) + '</td>'+
+      '<td>' + esc((r.model || '')) + '</td>'+
+      '<td>' + esc((r.hIni ?? '') + ' → ' + (r.hFim ?? '')) + '</td>'+
+      '<td>' + esc(r.totalFmt || '—') + '</td>'+
+      '<td><button class="btn btnDanger" type="button" data-id="' + esc(r.id) + '">Excluir</button></td>'+
+    '</tr>'
+  )).join('');
+
+  body.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number(btn.getAttribute('data-id'));
+      const next = getMaint().filter(x => Number(x.id) !== id);
+      setMaint(next);
+      renderMaintList();
+      showMaintMsg('Proposta removida.');
+    });
+  });
+}
+
+function openMaintModal(){
+  document.getElementById('maintModal').classList.add('show');
+  document.getElementById('maintModal').setAttribute('aria-hidden','false');
+  document.getElementById('maintListWrap').style.display = 'none';
+  updateMaintCount();
+  fillProposalModels();
+    bindPhoneMask();
+  
+}
+
+function closeMaintModal(){
+  document.getElementById('maintModal').classList.remove('show');
+  document.getElementById('maintModal').setAttribute('aria-hidden','true');
+}
+
+function saveMaint(){
+  calcProposal();
+
+  const clientName = document.getElementById('pClientName').value.trim();
+  const clientPhone = document.getElementById('pClientPhone').value.trim();
+  const clientEmail = document.getElementById('pClientEmail').value.trim();
+
+  const model = document.getElementById('pModel').value.trim();
+  const city = document.getElementById('pCity').value.trim();
+  const hIni = Number(document.getElementById('pHIni').value || 0);
+  const hFim = Number(document.getElementById('pHFim').value || 0);
+  const fee = Number(document.getElementById('pFee').value || 0);
+  const feeTimes = Number(document.getElementById('pFeeTimes').value || 0);
+  const payCond = document.getElementById('pPayCond').value.trim();
+  const hydOpt = String(document.getElementById('pHydOpt')?.value || '2000');
+
+  if (!priceMap || !priceMap.size){
+    showMaintMsg('Carregue a tabela de preços para calcular e salvar a proposta.');
+    return;
+  }
+  if (!allData.length){
+    showMaintMsg('Carregue a base de peças para calcular a proposta.');
+    return;
+  }
+  if (!clientName){
+    showMaintMsg('Informe o nome do cliente.');
+    return;
+  }
+  if (!model){
+    showMaintMsg('Selecione o modelo.');
+    return;
+  }
+
+  const totalFmt = document.getElementById('pTotal').value;
+  const costHourFmt = document.getElementById('pCostHour').value;
+
+  const rec = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString('pt-BR'),
+
+    clientName, clientPhone, clientEmail,
+    model, city, hIni, hFim,
+    fee, feeTimes,
+    totalFmt, costHourFmt,
+    payCond, hydOpt };
+
+  const list = getMaint();
+  list.push(rec);
+  setMaint(list);
+
+  showMaintMsg('Proposta salva com sucesso!');
+  renderMaintList();
+}
+
+function clearMaint(){
+  if (!confirm('Apagar todos os registros salvos neste navegador?')) return;
+  setMaint([]);
+  renderMaintList();
+  showMaintMsg('Registros apagados.');
+}
+
+// =============== Wire events ===============
+
+// Checkbox -> controla quais itens entram no gráfico
+const sbEl = document.getElementById('summaryBody');
+if (sbEl){
+  sbEl.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t || !t.classList || !t.classList.contains('chartItemChk')) return;
+    const k = t.getAttribute('data-key');
+    if (!chartSelKeys) chartSelKeys = new Set();
+    if (t.checked) chartSelKeys.add(k);
+    else chartSelKeys.delete(k);
+    renderChart(lastSummaryForChart, lastHoursForChart);
+  });
+}
+
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  const f = (e.target.files && e.target.files[0]);
+  if (f) loadFile(f);
+});
+
+['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, (e) => {
+  e.preventDefault();
+  dropZone.classList.add('drag');
+}));
+['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+}));
+dropZone.addEventListener('drop', (e) => {
+  const f = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (f) loadFile(f);
+});
+
+const priceInput = document.getElementById('priceInput');
+const priceDropZone = document.getElementById('priceDropZone');
+if (priceDropZone && priceInput){
+  priceDropZone.addEventListener('click', () => priceInput.click());
+
+  priceInput.addEventListener('change', (e) => {
+    const f = (e.target.files && e.target.files[0]);
+    if (f) loadPriceFile(f);
+    e.target.value = '';
+  });
+
+  ['dragenter','dragover'].forEach(ev => priceDropZone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    priceDropZone.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => priceDropZone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    priceDropZone.classList.remove('drag');
+  }));
+  priceDropZone.addEventListener('drop', (e) => {
+    const f = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+    if (f) loadPriceFile(f);
+  });
+}
+
+  // Recalculo automático no modal removido (totais são calculados ao salvar/exportar)
+
+document.getElementById('modelSelect').addEventListener('change', render);
+document.getElementById('hoursSelect').addEventListener('change', render);
+document.getElementById('searchInput').addEventListener('input', scheduleRender);
+
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  allData = [];
+  populateFilters();
+  render();
+  setStatus('idle','Aguardando arquivo...');
+});
+
+// Modal
+
+document.getElementById('btnMaintenance').addEventListener('click', openMaintModal);
+document.getElementById('btnCloseModal').addEventListener('click', closeMaintModal);
+
+// Modal: seleção de itens do PDF
+const __selModal = document.getElementById('selectItemsModal');
+if (__selModal){
+  __selModal.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'selectItemsModal') closeSelectItemsModal();
+  });
+}
+
+document.getElementById('btnSelClose')?.addEventListener('click', () => { if (typeof closeSelectItemsModal === 'function') closeSelectItemsModal(); });
+document.getElementById('btnSelCancel')?.addEventListener('click', () => { if (typeof closeSelectItemsModal === 'function') closeSelectItemsModal(); });
+
+document.getElementById('btnSelAll')?.addEventListener('click', () => {
+  pdfSelKeys = pdfSelKeys || new Set();
+  document.querySelectorAll('#selItemsBody .selItemChk').forEach(chk => {
+    chk.checked = true;
+    pdfSelKeys.add(chk.getAttribute('data-key'));
+  });
+  const head = document.getElementById('chkSelAll');
+  if (head) head.checked = true;
+});
+
+document.getElementById('btnSelNone')?.addEventListener('click', () => {
+  if (pdfSelKeys) pdfSelKeys.clear();
+  document.querySelectorAll('#selItemsBody .selItemChk').forEach(chk => { chk.checked = false; });
+  const head = document.getElementById('chkSelAll');
+  if (head) head.checked = false;
+});
+
+document.getElementById('chkSelAll')?.addEventListener('change', (e) => {
+  const checked = !!e.target.checked;
+  if (!pdfSelKeys) pdfSelKeys = new Set();
+  pdfSelEdits = new Map();
+  if (!checked) pdfSelKeys.clear();
+  document.querySelectorAll('#selItemsBody .selItemChk').forEach(chk => {
+    chk.checked = checked;
+    const k = chk.getAttribute('data-key');
+    if (checked) pdfSelKeys.add(k);
+  });
+});
+
+document.getElementById('btnSelConfirm')?.addEventListener('click', () => {
+  if (!pdfSelKeys || !pdfSelKeys.size){
+    showMsg('Selecione pelo menos um item.');
+    return;
+  }
+  closeSelectItemsModal();
+  exportProposalPDF();
+});
+
+document.getElementById('maintModal').addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'maintModal') closeMaintModal();
+});
+
+document.getElementById('btnSaveMaint')?.addEventListener('click', saveMaint);
+document.getElementById('btnListMaint')?.addEventListener('click', renderMaintList);
+document.getElementById('btnClearMaint')?.addEventListener('click', clearMaint);
+
+// init
+allData = [];
+populateFilters();
+render();
+setStatus('idle','Aguardando arquivo...');
+updateMaintCount();
+</script>
+
+<div id="printArea" style="display:none"></div>
+
+<script>
+
+  const BENEFICIOS = ['Flexibilidade no pagamento em até 10 parcelas, melhorando o fluxo de caixa do cliente.','Previsibilidade no custo das manutenções preventivas.','Prioridade em atendimentos para manutenções corretivas.','Leitura Matris comentada em todas as revisões múltiplas de 1000 horas.','Análise de óleo comentada a cada 1.0000 horas.','Medição do material rodante a cada 1000 horas para equipamentos até 22 toneladas, acima, a cada 2000 horas.','Maior disponibilidade mecânica do equipamento por conta das manutenções preventivas.','Atendimento com equipe treinada e capacitada pelo fabricante.','Análise de desconto em componentes via Fabricante para as máquinas que tem acordo vigente'];
+
+  function esc(x){
+    return String(x ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#039;');
+  }
+
+  function safeNum(x){
+    if (x === null || x === undefined) return 0;
+    const s = String(x).trim().replaceAll('R$','').replaceAll('.', '').replaceAll(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function fmtBRL2(v){
+    try { if (typeof fmtBRL === 'function') return fmtBRL(v); } catch(e){}
+    return Number(v || 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+  }
+
+  function showMsg(text){
+    try { if (typeof showMaintMsg === 'function') { showMaintMsg(text); return; } } catch(e){}
+    alert(text);
+  }
+
+  function getVal(id){
+    const el = document.getElementById(id);
+    if (!el) return '';
+    const v = (typeof el.value === 'string') ? el.value : (el.textContent || '');
+    return String(v ?? '').trim();
+  }
+
+  
+
+  // Telefone (MS): formata somente ao sair do campo (não interfere durante a digitação)
+  function formatPhoneMS(raw){
+  const digitsAll = String(raw ?? '').replace(/\D/g, '');
+  if (!digitsAll) return '';
+
+  // Se o usuário digitou DDD (ex.: 67), formata com DDD; caso contrário, NÃO adiciona automaticamente.
+  let ddd = '';
+  let d = digitsAll;
+
+  // Remove prefixo do país se vier (55)
+  if (d.startsWith('55') && d.length > 11) d = d.slice(2);
+
+  // Com DDD 67 informado pelo usuário
+  if (d.length >= 11 && d.startsWith('67')) {
+    ddd = '67';
+    d = d.slice(2, 11); // 9 dígitos
+  } else if (d.length == 10 && d.startsWith('67')) {
+    ddd = '67';
+    d = d.slice(2, 10); // 8 dígitos
+  } else {
+    // Sem DDD: limita para 9 dígitos (celular) ou 8 (fixo) sem prefixar 67
+    d = d.slice(0, 9);
+  }
+
+  // Monta (sem interferir na digitação; só é usado no blur)
+  let out = '';
+  if (ddd) out += ddd + ' ';
+
+  if (d.length <= 4) return out + d;
+  if (d.length <= 8) return out + d.slice(0, 4) + '-' + d.slice(4);
+  // 9 dígitos: 1 + 4 + 4
+  return out + d.slice(0, 1) + d.slice(1, 5) + '-' + d.slice(5, 9);
+}
+
+
+  function bindPhoneMask(){
+    const el = document.getElementById('pClientPhone');
+    if (!el) return;
+
+    const onBlur = () => {
+      const digits = String(el.value || '').replace(/\D+/g,'');
+      if (!digits){ el.value = ''; return; }
+      el.value = formatPhoneMS(el.value);
+    };
+
+    el.addEventListener('blur', onBlur);
+  }
+function buildProposalItems(model, hIni, hFim) {
+    if (!allData || !allData.length) return { items: [], hourNs: [] };
+    if (!priceMap || !priceMap.size) return { items: [], hourNs: [] };
+
+    const hydOpt = String(document.getElementById('pHydOpt')?.value || '2000');
+
+    const lo = Math.min(hIni, hFim);
+    const hi = Math.max(hIni, hFim);
+
+    const baseHoursCols = (typeof getHourColumnsFromData === 'function')
+      ? getHourColumnsFromData().filter(x => x && Number.isFinite(x.n) && x.n >= lo && x.n <= hi)
+      : [];
+
+    const rows = allData.filter(r => String(r.Modelo ?? r['Modelo'] ?? '').trim() === String(model).trim());
+
+    const hoursCols = baseHoursCols.slice();
+    const AD1_KEY = 'Ad. 1ª Revisão';
+    const includeAd1 = Number(hIni || 0) === 0 && rows.length && (AD1_KEY in rows[0]);
+    if (includeAd1) hoursCols.unshift({ k: AD1_KEY, n: AD1_KEY });
+
+    const hourNs = hoursCols.map(x => x.n);
+
+    const agg = new Map();
+    for (const hc of hoursCols) {
+      const colKey = hc.k;
+      const hourN = hc.n;
+
+      for (const r of rows) {
+        const descRaw = String(r['Descrição'] ?? r.Descrição ?? r.Descricao ?? r['Descricao'] ?? '');
+          const pnRaw = String(r['Part number'] ?? r.PartNumber ?? r.partNumber ?? r['PartNumber'] ?? r['PN'] ?? r.PN ?? r['Part'] ?? r.Part ?? '');
+          const pn = pnRaw.replace(/\s+/g,'');
+        const descNorm = descRaw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+        // Hidráulico: manter tempo padrão conforme intervalo selecionado
+        if (descNorm.includes('tempo padrao troca de oleo hidraulico')) {
+          if (hydOpt === '2000' && !descNorm.includes('2000')) continue;
+          if (hydOpt === '4000' && !descNorm.includes('4000')) continue;
+          if (hydOpt === '5000' && !descNorm.includes('5000')) continue;
+        }
+        
+
+          // 2) PN/interval filter for hydraulic oil
+        // - Tempo padrão: filtra pelo intervalo selecionado (feito acima) e PN não é relevante
+        // - Óleo do Hidráulico: filtra pelo intervalo + PN
+        if (descNorm.includes('oleo do hidraulico')) {
+          const pnRaw = String(r['Part number'] ?? r.PartNumber ?? r.partNumber ?? r['PartNumber'] ?? r['PN'] ?? r.PN ?? r['Part'] ?? r.Part ?? '');
+          const pn = pnRaw.replace(/\s+/g,'');
+          const has2000 = descNorm.includes('2000');
+          const has4000 = descNorm.includes('4000');
+          const has5000 = descNorm.includes('5000');
+
+          if (hydOpt === '5000') {
+            if (pn && pn !== '17229980') continue;
+            if (has2000 || has4000) continue;
+          } else {
+            if (pn && pn !== '55268386') continue;
+            if (hydOpt === '2000' && !has2000 && (has4000 || has5000)) continue;
+            if (hydOpt === '4000' && !has4000 && (has2000 || has5000)) continue;
+            if (has5000) continue;
+          }
+        }
+
+        const qty = (typeof num === 'function') ? num(r[colKey]) : safeNum(r[colKey]);
+        if (!(qty > 0)) continue;
+
+        const unit = (priceMap.get(normRef(pn)) || 0);
+        const key = pn + '|' + descRaw;
+
+        if (!agg.has(key)) agg.set(key, { pn, desc: descRaw, hours: {}, qtyTotal: 0, unit });
+        const it = agg.get(key);
+
+        it.hours[hourN] = (it.hours[hourN] || 0) + qty;
+        it.qtyTotal += qty;
+        if (!it.unit && unit) it.unit = unit;
+      }
+    }
+
+    const items = Array.from(agg.values()).map(it => ({
+      ...it,
+      total: (it.unit || 0) * (it.qtyTotal || 0)
+    }));
+
+    items.sort((a,b) => (b.total - a.total) || (b.qtyTotal - a.qtyTotal) || a.desc.localeCompare(b.desc));
+    return { items, hourNs };
+  }
+
+function buildPrintHTML(){
+    const clientName = getVal('pClientName');
+    const clientPhone = getVal('pClientPhone');
+    const clientEmail = getVal('pClientEmail');
+
+    const model = getVal('pModel');
+    const city = getVal('pCity');
+
+    const hIni = Number(document.getElementById('pHIni')?.value || 0);
+    const hFim = Number(document.getElementById('pHFim')?.value || 0);
+
+    const fee = Number(document.getElementById('pFee')?.value || 0);
+    const feeTimes = Number(document.getElementById('pFeeTimes')?.value || 0);
+    const payCond = getVal('pPayCond');
+
+    if (!clientName) return { err: 'Informe o nome do cliente antes de exportar.' };
+    if (!model) return { err: 'Selecione o modelo antes de exportar.' };
+    if (!allData || !allData.length) return { err: 'Carregue a base de peças antes de exportar.' };
+    if (!priceMap || !priceMap.size) return { err: 'Carregue a tabela de preços antes de exportar.' };
+
+    try { if (typeof calcProposal === 'function') calcProposal(); } catch(e){}
+
+    const builtItems = buildProposalItems(model, hIni, hFim);
+    const items = builtItems.items;
+    const hourNs = builtItems.hourNs;
+
+    // Seleção de itens (apenas para o PDF)
+    const _sel = (pdfSelKeys && pdfSelKeys.size) ? pdfSelKeys : null;
+    const itemsEff = _sel ? items.filter(it => _sel.has(String(it.pn||'') + '|' + String(it.desc||''))) : items;
+
+    // Aplicar edições (descrição/qtd) somente no PDF
+    const _ed = (pdfSelEdits && pdfSelEdits.size) ? pdfSelEdits : null;
+    const itemsFinal = itemsEff.map(it => {
+      const k = String(it?.pn || '') + '|' + String(it?.desc || '');
+      const ed = _ed ? _ed.get(k) : null;
+      if (!ed) return it;
+      const qty = (ed.qty === 0 || ed.qty) ? Number(ed.qty) : Number(it.qtyTotal || 0);
+      const desc = (ed.desc === '' || ed.desc) ? String(ed.desc) : String(it.desc || '');
+      const unit = Number(it.unit || 0);
+      return { ...it, desc, qtyTotal: qty, total: unit * qty };
+    });
+
+    const hourCount = (hourNs || []).length;
+    const pdfScaleClass = hourCount > 6 ? 'compact' : '';
+    const feeTotal = (fee || 0) * (feeTimes || 0);
+    const partsTotal = itemsFinal.reduce((a,it) => a + (it.total || 0), 0);
+    const total = partsTotal + feeTotal;
+    const periodo = Math.max(0, Math.abs((hFim || 0) - (hIni || 0)));
+    const costHour = periodo > 0 ? (total / periodo) : 0;
+
+    const thHours = (hourNs || []).map(h => {
+      const isNum = (typeof h === 'number' && Number.isFinite(h));
+      const label = isNum ? `${h}h` : String(h);
+      const w = isNum ? 58 : 110;
+      const ta = isNum ? 'right' : 'center';
+      return `<th style="width:${w}px; text-align:${ta};">${esc(label)}</th>`;
+    }).join('');
+
+    const now = new Date();
+    const dateBR = now.toLocaleDateString('pt-BR');
+    const timeBR = now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
+    const rows = itemsFinal.length ? itemsFinal.map(it => {
+      const cols = (hourNs || []).map(h => {
+        const v = Number(it.hours?.[h] || 0);
+        return `<td style="text-align:right;">${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>`;
+      }).join('');
+
+      return `
+      <tr>
+        <td>${esc(it.desc)}</td>
+        <td style="white-space:nowrap;">${esc(it.pn || '-')}</td>
+        ${cols}
+        <td style="text-align:right;">${Number(it.qtyTotal||0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
+        <td style="text-align:right;">${fmtBRL2(it.unit||0)}</td>
+        <td style="text-align:right;">${fmtBRL2(it.total||0)}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="${(hourNs||[]).length + 5}">Nenhum item selecionado.</td></tr>`;
+
+    const beneficios = BENEFICIOS.map((t) => `<li>${esc(t)}</li>`).join('');
+
+    const html = `
+      <div class="pdfPage">
+        <style>
+          .pdfPage{ font-family: Arial, Helvetica, sans-serif;
+          .pdfPage.compact{ font-size:10px; }
+          .pdfPage.compact table{ font-size:10px; }
+          .pdfPage.compact th, .pdfPage.compact td{ padding:5px 5px; }
+          .pdfPage.compact .h2{ font-size:11px; }
+          .pdfPage.compact .muted{ font-size:10px; }
+ color:#111; background:#fff; padding:18px; }
+          .pdfTop{ display:grid; grid-template-columns:160px 1fr 260px; align-items:flex-start; gap:14px; }
+          .pdfLogo{ flex-shrink:0; } .pdfLogo img{ width:120px; height:auto; display:block; }
+          .pdfTitle{ text-align:center; }
+          .pdfTitle h1{ margin:0; font-size:18px; }
+
+          .pdfTop{ align-items:center; min-height:52px; }
+          .pdfTitle h1{ white-space:nowrap; }
+          .pdfTop .box{ max-height:52px; overflow:hidden; }
+
+          .pdfTop{ display:grid; grid-template-columns: 140px 1fr 220px; gap:12px; align-items:start; }
+          .pdfLogoSpace{ width:140px; height:40px; }
+          .pdfClient{ max-height:52px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+          .pdfClient .muted{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+
+          .muted{ color:#555; font-size:11px; }
+          .box{ border:1px solid #d7dde5; border-radius:8px; padding:10px; }
+          .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+          .h2{ margin:0 0 6px 0; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:#374151; }
+          table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
+          th,td{ border-bottom:1px solid #e5e7eb; padding:7px 6px; vertical-align:top; }
+          th{ background:#f3f4f6; font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
+          .totals{ display:grid; grid-template-columns:1fr 280px; gap:10px; margin-top:10px; }
+          .sumrow{ display:flex; justify-content:space-between; gap:10px; margin:6px 0; }
+          .benefTitle{ background:#d9d9d9; text-align:center; font-weight:700; padding:6px 8px; border-radius:6px; }
+          .benef ol{ margin:8px 0 0 0; padding-left:18px; }
+          .benef li{ margin:6px 0; line-height:1.25; }
+          .benef .bn{ display:inline-block; width:18px; font-weight:700; }
+          .sig{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+          .sigline{ border-top:1px solid #111; margin-top:28px; }
+        </style>
+
+        <div class="pdfTop" style="display:none">
+          <div class="pdfLogo"><div class="pdfLogoSpace"></div></div>
+          <div class="pdfTitle"><h1>Proposta / Acordo de Manutenção</h1><div class="muted">${getIncludeTimestamp() ? ('Emitido em ' + esc(dateBR) + ' ' + esc(timeBR)) : ''}</div></div>
+          <div class="box" style="min-width:260px;">
+            <div class="muted">Cliente</div>
+            <div><b>${esc(clientName)}</b></div>
+            <div class="muted">${esc(clientPhone)}${clientEmail ? ' • ' + esc(clientEmail) : ''}</div>
+            <div class="muted">${esc(city)}</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="box">
+            <div class="h2">Equipamento</div>
+            <div><b>Modelo:</b> ${esc(model)}</div>
+            <div><b>Horas:</b> ${esc(hIni)} → ${esc(hFim)}</div>
+            <div><b>Custo hora:</b> ${fmtBRL2(costHour)}</div>
+          </div>
+          <div class="box">
+            <div class="h2">Condição de pagamento</div>
+            <div>${esc(payCond || '-')}</div>
+          </div>
+        </div>
+
+        <div class="box" style="margin-top:10px;">
+          <div class="h2">Itens</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th style="width:120px;">Part number</th>
+                ${thHours}
+                <th style="width:70px; text-align:right;">Qtd (total)</th>
+                <th style="width:90px; text-align:right;">Preço un.</th>
+                <th style="width:100px; text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+
+        <div class="totals">
+          <div class="box benef">
+            <div class="benefTitle">Benefícios do Acordo</div>
+            <ol>${beneficios}</ol>
+          </div>
+          <div class="box">
+            <div class="h2">Totais</div>
+            <div class="sumrow"><span>Subtotal peças</span><span>${fmtBRL2(partsTotal)}</span></div>
+            <div class="sumrow"><span>Atendimento (${feeTimes}×)</span><span>${fmtBRL2(feeTotal)}</span></div>
+            <div class="sumrow"><b>Total</b><b>${fmtBRL2(total)}</b></div>
+            <div class="sumrow muted"><span>Custo hora</span><span>${fmtBRL2(costHour)}</span></div>
+          </div>
+        </div>
+
+        <div class="sig">
+          <div class="box">
+            <div class="h2">Assinatura</div>
+            <div class="sigline"></div>
+            <div class="muted">Responsável</div>
+          </div>
+          <div class="box">
+            <div class="h2">Aceite do cliente</div>
+            <div class="sigline"></div>
+            <div class="muted">Nome / Assinatura</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    return { html, clientName };
+  }
+
+  
+  // Opção 3: Converter imagem externa para base64 (para entrar no html2canvas)
+  async function convertImageToBase64(imgUrl) {
+    const response = await fetch(imgUrl, { mode: 'cors' });
+    if (!response.ok) throw new Error('Fetch failed: ' + response.status);
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+
+  const NORS_LOGO_B64 = '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'; const NORS_LOGO_MIME = 'image/jpeg';
+
+  
+
+
+// Chave estável do item (PN|Descrição) usada na seleção/edição do PDF
+function selItemKey(it){
+  return String(it?.pn || '') + '|' + String(it?.desc || '');
+}
+
+
+function openSelectItemsModal(built){
+  // Sempre inicia estruturas usadas na seleção/edição
+  const edits = new Map();
+  pdfSelEdits = edits;
+  pdfSelBuilt = built;
+  pdfSelKeys = new Set();
+
+  const body = document.getElementById('selItemsBody');
+  if (!body){ showMsg('Tabela de seleção não encontrada.'); return; }
+
+  const chkAll = document.getElementById('chkSelAll');
+  const items = (built && built.items) ? built.items : [];
+
+  if (!items.length){
+    body.innerHTML = '<tr><td colspan="7" class="note">Nenhum item no intervalo.</td></tr>';
+  } else {
+    // Marcar tudo por padrão e carregar valores editáveis iniciais
+    for (const it of items){
+      const key = selItemKey(it);
+      pdfSelKeys.add(key);
+      edits.set(key, { desc: String(it.desc || ''), qty: Number(it.qtyTotal || 0) });
+    }
+
+    if (chkAll) chkAll.checked = true;
+
+    body.innerHTML = items.map(it => {
+      const key = selItemKey(it);
+      const descVal = String(it.desc || '');
+      const qtyVal = Number(it.qtyTotal || 0);
+      const unitVal = Number(it.unit || 0);
+      const totVal = Number(it.total || 0);
+
+      return `
+        <tr>
+          <td style="text-align:center;"><input type="checkbox" class="selItemChk" data-key="${esc(key)}" checked /></td>
+          <td>
+            <input class="selDesc" data-key="${esc(key)}" type="text" value="${esc(descVal)}" style="width:100%; padding:7px 8px; border-radius:10px; border:1px solid var(--border); background:rgba(15,22,48,.9); color:var(--text);" />
+          </td>
+          <td style="white-space:nowrap;"><span class="pn">${esc(it.pn || '-')}</span></td>
+          <td style="text-align:right;">
+            <input class="selQty" data-key="${esc(key)}" type="number" min="0" step="0.01" value="${qtyVal}" style="width:84px; padding:7px 8px; border-radius:10px; border:1px solid var(--border); background:rgba(15,22,48,.9); color:var(--text); text-align:right;" />
+          </td>
+          <td style="text-align:right;"><span class="selUnit" data-unit="${unitVal}">${fmtBRL2(unitVal)}</span></td>
+          <td style="text-align:right;"><span class="selTot" data-key="${esc(key)}">${fmtBRL2(totVal)}</span></td>
+        </tr>`;
+    }).join('');
+
+    body.querySelectorAll('.selItemChk').forEach(chk => {
+      chk.addEventListener('change', () => {
+        const k = chk.getAttribute('data-key');
+        if (chk.checked) pdfSelKeys.add(k);
+        else pdfSelKeys.delete(k);
+      });
+    });
+
+    body.querySelectorAll('.selDesc').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const k = inp.getAttribute('data-key');
+        const cur = edits.get(k) || { desc: '', qty: 0 };
+        cur.desc = String(inp.value || '');
+        edits.set(k, cur);
+      });
+    });
+
+    body.querySelectorAll('.selQty').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const k = inp.getAttribute('data-key');
+        const raw = String(inp.value || '').replace(',', '.');
+        const qty = Number(raw);
+        const q = Number.isFinite(qty) ? qty : 0;
+
+        const cur = edits.get(k) || { desc: '', qty: 0 };
+        cur.qty = q;
+        edits.set(k, cur);
+
+        // Atualiza total visual
+        const tr = inp.closest('tr');
+        const unitEl = tr ? tr.querySelector('.selUnit') : null;
+        const totEl = tr ? tr.querySelector('.selTot') : null;
+        const unit = unitEl ? (Number(unitEl.getAttribute('data-unit')) || 0) : 0;
+        if (totEl) totEl.textContent = fmtBRL2(unit * q);
+
+        if (chkAll) chkAll.checked = true;
+      });
+    });
+  }
+
+  const modal = document.getElementById('selectItemsModal');
+  if (!modal){ showMsg('Modal de seleção não encontrado.'); return; }
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden','false');
+}
+
+function closeSelectItemsModal(){
+  document.getElementById('selectItemsModal').classList.remove('show');
+  document.getElementById('selectItemsModal').setAttribute('aria-hidden','true');
+}
+
+function handleExportPDFClick(){
+  const selectMode = !!document.getElementById('pSelectItemsMode')?.checked;
+  if (!selectMode){
+    pdfSelKeys = null;
+    pdfSelBuilt = null;
+    pdfSelEdits = null;
+    exportProposalPDF();
+    return;
+  }
+
+  const model = String(document.getElementById('pModel')?.value || '').trim();
+  const hIni = Number(document.getElementById('pHIni')?.value || 0);
+  const hFim = Number(document.getElementById('pHFim')?.value || 0);
+
+  if (!model){ showMsg('Selecione o modelo antes de exportar.'); return; }
+  if (!allData || !allData.length){ showMsg('Carregue a base de peças antes de exportar.'); return; }
+  if (!priceMap || !priceMap.size){ showMsg('Carregue a tabela de preços antes de exportar.'); return; }
+
+  const built = buildProposalItems(model, hIni, hFim);
+  openSelectItemsModal(built);
+}
+async function exportProposalPDF(){
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(e){}
+    await new Promise(r => setTimeout(r, 0));
+
+    const built = buildPrintHTML();
+    if (built.err){ showMsg(built.err); return; }
+
+    const printArea = document.getElementById('printArea');
+    if (!printArea){ showMsg('printArea não encontrado.'); return; }
+
+    printArea.innerHTML = built.html;
+    printArea.style.display = 'block';
+
+    try{
+      // Converte logo para base64 (evita CORS no html2canvas)
+      try {
+        const logoImg = printArea.querySelector('.pdfLogo img');
+        if (logoImg && logoImg.src && logoImg.src.startsWith('http')) {
+          const base64 = await convertImageToBase64(logoImg.src);
+          if (base64) logoImg.src = base64;
+        }
+      } catch(e) {
+        console.warn('Logo não convertido (CORS/Fetch):', e);
+      }
+
+      const node = printArea.firstElementChild;
+      const canvas = await html2canvas(node, { scale: 2.5, 
+        scale: 2.5,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight
+      });
+
+      // Remove bordas brancas extras do render (corrige sensação de desalinhamento)
+      function trimCanvas(c){
+        try {
+          const w = c.width, h = c.height;
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          const img = ctx.getImageData(0, 0, w, h);
+          const d = img.data;
+          let minX = w, minY = h, maxX = -1, maxY = -1;
+          const isBg = (r,g,b,a) => (a === 0) || (r > 250 && g > 250 && b > 250);
+          for (let y=0; y<h; y++){
+            let rowHas = false;
+            const row = y*w*4;
+            for (let x=0; x<w; x++){
+              const i = row + x*4;
+              const r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
+              if (!isBg(r,g,b,a)){
+                rowHas = true;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+              }
+            }
+            if (rowHas){
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+          if (maxX < 0 || maxY < 0) return c;
+          // Padding leve para não cortar linhas finas
+          const pad = 6;
+          minX = Math.max(0, minX - pad);
+          minY = Math.max(0, minY - pad);
+          maxX = Math.min(w-1, maxX + pad);
+          maxY = Math.min(h-1, maxY + pad);
+          const tw = maxX - minX + 1;
+          const th = maxY - minY + 1;
+          const out = document.createElement('canvas');
+          out.width = tw;
+          out.height = th;
+          out.getContext('2d').drawImage(c, minX, minY, tw, th, 0, 0, tw, th);
+          return out;
+        } catch(e){
+          return c;
+        }
+      }
+
+      const trimmedCanvas = trimCanvas(canvas);
+      const imgData = trimmedCanvas.toDataURL('image/jpeg', 0.92);
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4', compress: true });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      // Espaçamentos
+      const marginBottom = 6; // mm
+      const marginLeft = 14; // mm
+      const marginRight = 14; // mm
+      const headerH = 26; // mm (reserva para header desenhado via jsPDF)
+
+      const availW = pageW - marginLeft - marginRight;
+      const availH = pageH - headerH - marginBottom;
+
+      // Conteúdo (imagem do html2canvas)
+      const ratio = Math.min(availW / trimmedCanvas.width, availH / trimmedCanvas.height);
+      const drawW = trimmedCanvas.width * ratio;
+      const drawH = trimmedCanvas.height * ratio;
+      // Centraliza horizontalmente dentro da página (mantendo o mesmo scale)
+      const x = (pageW - drawW) / 2;
+      const y = headerH;
+
+      // Header desenhado via jsPDF (alinhamento consistente)
+      const headerY = 3;
+      const hdrH = 20; // altura total do header
+
+      // Limites do conteúdo baseado na área do corpo renderizado
+      const bodyLeft = x;
+      const bodyRight = x + drawW;
+
+      // Box do cliente (direita) - precisa existir antes do cálculo do logoY
+      const clientBoxW = 60;
+      const clientBoxH = 16;
+      const clientBoxX = bodyRight - clientBoxW;
+      const clientBoxY = headerY + (hdrH - clientBoxH) / 2;
+
+      pdf.setDrawColor(200);
+      pdf.setFillColor(255);
+      pdf.roundedRect(clientBoxX, clientBoxY, clientBoxW, clientBoxH, 1.5, 1.5, 'S');
+
+      // Logo (esquerda) - centralizada verticalmente ao box do cliente
+      const logoW = 18;
+      const logoH = 9;
+      const logoX = bodyLeft;
+      const logoY = clientBoxY + (clientBoxH - logoH) / 2 - 1.0; // ajuste visual
+      try {
+        if (typeof NORS_LOGO_B64 === 'string' && NORS_LOGO_B64.length > 100) {
+          pdf.addImage(NORS_LOGO_B64, (NORS_LOGO_MIME || '').includes('png') ? 'PNG' : 'JPEG', logoX, logoY, logoW, logoH);
+        }
+      } catch(e) {}
+
+      // Centro real do título: entre o fim da logo e o início do box do cliente
+      const gap = 6;
+      const titleLeft = logoX + logoW + gap;
+      const titleRight = clientBoxX - gap;
+      const titleCenterX = (titleLeft + titleRight) / 2;
+
+      // Bloco do título (2 linhas) centralizado verticalmente no header
+      const titleBlockH = 9;
+      const titleBlockTop = headerY + (hdrH - titleBlockH) / 2;
+      const titleY = titleBlockTop + 5.2;
+      const emittedY = titleBlockTop + 9.2;
+
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(12);
+      pdf.text('Proposta / Acordo de Manutenção', titleCenterX, titleY, { align: 'center' });
+
+      pdf.setFont('helvetica','normal');
+      pdf.setFontSize(8);
+      const now = new Date();
+      const emitted = 'Emitido em ' + now.toLocaleString('pt-BR');
+      if(getIncludeTimestamp()) pdf.text(emitted, titleCenterX, emittedY, { align: 'center' });
+
+      // Textos dentro do box do cliente
+      pdf.setFont('helvetica','normal');
+      pdf.setFontSize(7);
+      pdf.text('Cliente', clientBoxX + 3, clientBoxY + 3.5);
+
+      const maxW = clientBoxW - 6;
+
+      const fitText = (t, sizeMax, sizeMin) => {
+        if (!t) return { text: '', size: sizeMax };
+        let s = String(t);
+        let size = sizeMax;
+        pdf.setFontSize(size);
+        while (size > sizeMin && pdf.getTextWidth(s) > maxW) {
+          size = Math.max(sizeMin, size - 0.5);
+          pdf.setFontSize(size);
+        }
+        if (pdf.getTextWidth(s) <= maxW) return { text: s, size };
+        // fallback: elipse
+        let cut = s;
+        while (cut.length > 2 && pdf.getTextWidth(cut + '…') > maxW) cut = cut.slice(0, -1);
+        return { text: (cut.length ? cut + '…' : ''), size };
+      };
+
+      const clientName = (document.getElementById('pClientName')?.value || '').trim();
+      pdf.setFont('helvetica','bold');
+      const fittedName = fitText(clientName, 9, 6);
+      pdf.setFontSize(fittedName.size);
+      if (fittedName.text) pdf.text(fittedName.text, clientBoxX + 3, clientBoxY + 7.5);
+
+      pdf.setFont('helvetica','normal');
+      const clientInfo = [
+        (document.getElementById('pClientPhone')?.value || '').trim(),
+        (document.getElementById('pClientEmail')?.value || '').trim(),
+        (document.getElementById('pCity')?.value || '').trim()
+      ].filter(Boolean).join(' - ');
+      const fittedInfo = fitText(clientInfo, 6.5, 5);
+      pdf.setFontSize(fittedInfo.size);
+      if (fittedInfo.text) pdf.text(fittedInfo.text, clientBoxX + 3, clientBoxY + 12);
+
+      // Corpo renderizado
+      pdf.addImage(imgData, 'JPEG', x, y, drawW, drawH);
+
+      // Salvar PDF
+      const client = document.getElementById('pClientName')?.value || 'Cliente';
+      pdf.save('Proposta - ' + safeFileName(client) + '.pdf');
+
+    } catch(e){
+      console.error(e);
+      showMsg('Falha ao gerar PDF. Veja o console do navegador.');
+    } finally{
+      pdfSelKeys = null;
+      pdfSelBuilt = null;
+      pdfSelEdits = null;
+      printArea.style.display = 'none';
+    }
+  }
+
+  // Modelos: troca imagem grande + salva no navegador
+  function applyEquipSelection(src){
+    if (!src) return;
+    try { localStorage.setItem('equipImg', src); } catch(e) {}
+
+    const mainImg = document.getElementById('equipImg');
+    if (mainImg) {
+      // força reload mesmo se a mesma URL for escolhida novamente
+      mainImg.setAttribute('src', src);
+    }
+
+    // Destaque visual do selecionado
+    document.querySelectorAll('#equipChoices .equipCard').forEach(card => {
+      card.classList.toggle('active', card.getAttribute('data-src') === src);
+    });
+  }
+
+  
+
+// Equipamento: troca automática das imagens a cada 5s (sem seleção manual)
+function initEquipCarousel(){
+  const cards = Array.from(document.querySelectorAll('#equipChoices .equipCard'));
+  const sources = cards.map(b => b.getAttribute('data-src')).filter(Boolean);
+  if (!sources.length) return;
+
+  const carImg  = document.getElementById('equipCarouselImg');
+  if (!carImg) return;
+
+  let saved = null;
+  try { saved = localStorage.getItem('equipImg'); } catch(e) {}
+  let idx = 0;
+  if (saved){
+    const p = sources.indexOf(saved);
+    if (p >= 0) idx = p;
+  }
+
+  function show(i){
+    const src = sources[i % sources.length];
+    carImg.src = src;
+    try { localStorage.setItem('equipImg', src); } catch(e) {}
+  }
+
+  show(idx);
+
+  if (window.__equipCarouselTimer) clearInterval(window.__equipCarouselTimer);
+  window.__equipCarouselTimer = setInterval(() => {
+    idx = (idx + 1) % sources.length;
+    show(idx);
+  }, 5000);
+}
+function initEquipSelection(){
+  initEquipCarousel();
+}
+
+
+  // Inicia após o DOM estar pronto
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initEquipSelection);
+  } else {
+    initEquipSelection();
+  }
+
+
+  // Theme toggle (dark <-> light)
+  (function initThemeToggle(){
+    const root = document.documentElement;
+    const btn = document.getElementById('btnToggleTheme');
+    if (!btn) return;
+
+    const apply = (mode) => {
+      if (mode === 'light') root.setAttribute('data-theme','light');
+      else root.removeAttribute('data-theme');
+      btn.textContent = 'Tema: ' + (mode === 'light' ? 'Claro' : 'Escuro');
+      try { localStorage.setItem('theme', mode); } catch(e) {}
+    };
+
+    let saved = null;
+    try { saved = localStorage.getItem('theme'); } catch(e) {}
+    if (saved === 'light' || saved === 'dark') apply(saved);
+    else apply('dark');
+
+    btn.addEventListener('click', () => {
+      const current = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      apply(current === 'light' ? 'dark' : 'light');
+    });
+  })();
+
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t && t.id === 'btnExportPDF') handleExportPDFClick();
+  });
+</script>
+
+</body>
+</html>
