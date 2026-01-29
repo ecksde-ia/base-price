@@ -469,7 +469,35 @@ select:focus, input:focus{
             <input id="priceInput" type="file" accept=".xlsx,.xls,.csv" />
           </div>
 
-          <div style="height:12px"></div>
+          
+      <div style="height:12px"></div>
+
+      <div class="card" style="background:rgba(15,22,48,.35); border:1px dashed rgba(45,212,255,.35);">
+        <div class="hd"><h2>Atualizar do GitHub (Pages)</h2></div>
+        <div class="bd">
+          <div class="note" style="margin-bottom:10px;">Este modo busca automaticamente os arquivos <span class="pn">base.xlsx</span> e <span class="pn">price.xlsx</span> no mesmo repositório (GitHub Pages) e carrega no dashboard.</div>
+          <div class="formGrid" style="grid-template-columns: 1fr 1fr;">
+            <div>
+              <label>URL BASE (auto)</label>
+              <input id="baseUrlAuto" />
+              <small class="small">Padrão: <span class="pn">(site atual)/base.xlsx</span></small>
+            </div>
+            <div>
+              <label>URL PREÇOS (auto)</label>
+              <input id="priceUrlAuto" />
+              <small class="small">Padrão: <span class="pn">(site atual)/price.xlsx</span></small>
+            </div>
+          </div>
+          <div style="height:10px"></div>
+          <div class="toolbar">
+            <button class="btn" id="btnLoadPriceAuto" type="button">Carregar PREÇOS</button>
+            <button class="btn" id="btnLoadBaseAuto" type="button">Carregar BASE</button>
+            <button class="btn btnPrimary" id="btnLoadBothAuto" type="button">Atualizar (BASE + PREÇOS)</button>
+            <span class="note" id="autoLoadMsg" style="display:none;"></span>
+          </div>
+        </div>
+      </div>
+<div style="height:12px"></div>
 
           <div class="controls">
             <div>
@@ -739,6 +767,84 @@ select:focus, input:focus{
 </div>
 <script>
 'use strict';
+
+    // ===== Auto-load (GitHub Pages): base.xlsx + price.xlsx =====
+    const AUTOURLKEY = 'pmp_autourl_v1';
+
+    function getAutoCfg(){
+      try{ return JSON.parse(localStorage.getItem(AUTOURLKEY) || '{}'); }catch(e){ return {}; }
+    }
+    function setAutoCfg(cfg){
+      try{ localStorage.setItem(AUTOURLKEY, JSON.stringify(cfg||{})); }catch(e){}
+    }
+
+    function defaultRepoFileUrl(fileName){
+      try{
+        const u = new URL(window.location.href);
+        // If on /index.html, keep same folder; if on /something/, keep it.
+        // We always point to same directory level.
+        const basePath = u.pathname.endsWith('/') ? u.pathname : u.pathname.replace(/\/[^\/]*$/, '/');
+        return u.origin + basePath + fileName;
+      }catch(e){
+        return fileName;
+      }
+    }
+
+    function showAutoMsg(msg, kind='idle'){
+      const el = document.getElementById('autoLoadMsg');
+      if(!el) return;
+      el.style.display = 'inline';
+      el.style.color = (kind==='err') ? 'var(--bad)' : (kind==='ok' ? 'var(--good)' : 'var(--muted)');
+      el.textContent = msg;
+      if(kind!=='idle') setTimeout(()=>{ el.style.display='none'; }, 4500);
+    }
+
+    async function fetchArrayBuffer(url){
+      const res = await fetch(url, { method:'GET', cache:'no-store' });
+      if(!res.ok) throw new Error('Falha ao baixar ('+res.status+'): ' + (res.statusText||'erro'));
+      return await res.arrayBuffer();
+    }
+
+    async function loadBaseFromUrlAuto(url){
+      const u = String(url||'').trim();
+      if(!u) throw new Error('URL da BASE vazia.');
+      setStatus('idle','Baixando BASE...');
+      showAutoMsg('Baixando BASE...', 'idle');
+      const buf = await fetchArrayBuffer(u);
+      const wb = XLSX.read(buf, { type:'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      let rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      rows = normalizeDataset(rows);
+      if(!rows.length) throw new Error('BASE baixada, mas veio vazia.');
+      const sample = rows[0] || {};
+      const need = ['Modelo','Part number','Descrição','Qtd'];
+      const missing = need.filter(k=>!(k in sample));
+      if(missing.length) throw new Error('BASE: colunas ausentes: '+missing.join(', '));
+      allData = rows;
+      populateFilters();
+      render();
+      setStatus('ok','BASE carregada ('+rows.length.toLocaleString()+' linhas).');
+      showAutoMsg('BASE carregada.', 'ok');
+    }
+
+    async function loadPricesFromUrlAuto(url){
+      const u = String(url||'').trim();
+      if(!u) throw new Error('URL de PREÇOS vazia.');
+      setStatus('idle','Baixando PREÇOS...');
+      showAutoMsg('Baixando PREÇOS...', 'idle');
+      const buf = await fetchArrayBuffer(u);
+      const wb = XLSX.read(buf, { type:'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if(!rows.length) throw new Error('Tabela de preços vazia.');
+      const normalized = rows.map(normalizePriceRow).filter(r => String(r.Referencia??'').trim().length);
+      if(!normalized.length) throw new Error('Não encontrei coluna Referencia/Part number e Preco.');
+      setPrices(normalized);
+      setStatus('ok','PREÇOS carregados ('+priceMap.size+' itens).');
+      showAutoMsg('PREÇOS carregados.', 'ok');
+      render();
+    }
+
 
 // Debounce para evitar render pesado a cada tecla
 let __renderTimer = null;
@@ -2478,6 +2584,74 @@ function initEquipSelection(){
     const t = e.target;
     if (t && t.id === 'btnExportPDF') handleExportPDFClick();
   });
+
+
+    // ===== Eventos: Auto-load GitHub Pages =====
+    (function initAutoLoad(){
+      const cfg = getAutoCfg();
+      const baseEl = document.getElementById('baseUrlAuto');
+      const priceEl = document.getElementById('priceUrlAuto');
+
+      const defBase = defaultRepoFileUrl('base.xlsx');
+      const defPrice = defaultRepoFileUrl('price.xlsx');
+
+      if(baseEl) baseEl.value = cfg.baseUrl || defBase;
+      if(priceEl) priceEl.value = cfg.priceUrl || defPrice;
+
+      function persist(){
+        const next = getAutoCfg();
+        next.baseUrl = String(baseEl?.value || '').trim();
+        next.priceUrl = String(priceEl?.value || '').trim();
+        setAutoCfg(next);
+      }
+
+      baseEl?.addEventListener('change', persist);
+      priceEl?.addEventListener('change', persist);
+
+      document.getElementById('btnLoadPriceAuto')?.addEventListener('click', async ()=>{
+        try{
+          persist();
+          await loadPricesFromUrlAuto(String(priceEl?.value||''));
+        }catch(e){
+          setStatus('err','Erro PREÇOS (GitHub)');
+          showAutoMsg((e && e.message) ? e.message : String(e), 'err');
+        }
+      });
+
+      document.getElementById('btnLoadBaseAuto')?.addEventListener('click', async ()=>{
+        try{
+          persist();
+          await loadBaseFromUrlAuto(String(baseEl?.value||''));
+        }catch(e){
+          setStatus('err','Erro BASE (GitHub)');
+          showAutoMsg((e && e.message) ? e.message : String(e), 'err');
+        }
+      });
+
+      document.getElementById('btnLoadBothAuto')?.addEventListener('click', async ()=>{
+        try{
+          persist();
+          // preços primeiro para já calcular valores
+          await loadPricesFromUrlAuto(String(priceEl?.value||''));
+          await loadBaseFromUrlAuto(String(baseEl?.value||''));
+        }catch(e){
+          setStatus('err','Erro atualização (GitHub)');
+          showAutoMsg((e && e.message) ? e.message : String(e), 'err');
+        }
+      });
+
+      // Auto-carrega ao abrir (se os arquivos existirem). Se quiser desativar, comente as linhas abaixo.
+      setTimeout(async ()=>{
+        try{
+          if(cfg.autoOnOpen === false) return;
+          await loadPricesFromUrlAuto(String(priceEl?.value||''));
+          await loadBaseFromUrlAuto(String(baseEl?.value||''));
+        }catch(e){
+          // Não trava o app se o arquivo ainda não existe.
+          showAutoMsg('Não foi possível auto-carregar (verifique se base.xlsx e price.xlsx existem no repo).', 'err');
+        }
+      }, 450);
+    })();
 </script>
 
 </body>
