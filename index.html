@@ -776,6 +776,10 @@ select:focus, input:focus{
 <script>
 'use strict';
 
+    // Senha em memória (sessão da aba)
+    var sessionPass = null;
+
+
     // ===== Auto-load (GitHub Pages): Base.enc + Price.enc =====
     const AUTOURLKEY = 'pmp_autourl_v1';
 
@@ -855,6 +859,10 @@ select:focus, input:focus{
         try{ setStatus('err', 'Senha não informada.'); }catch(_e){}
         throw new Error('Senha não informada (cancelado).');
       }
+      sessionPass = p;
+      return sessionPass;
+    }
+
       sessionPass = p;
       return sessionPass;
     }
