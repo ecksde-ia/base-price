@@ -467,13 +467,13 @@ select:focus, input:focus{
           <div class="upload" id="dropZone">
             <strong>Clique para selecionar</strong> ou arraste o arquivo aqui
             <small>Aceita .xlsx, .xls e .csv</small>
-            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.enc" />
           </div>
 
           <div class="upload" id="priceDropZone">
             <strong>Carregar tabela de preços</strong> ou arraste o arquivo aqui
             <small>Colunas: Referencia (Part number) e Preço. Aceita .xlsx, .xls e .csv</small>
-            <input id="priceInput" type="file" accept=".xlsx,.xls,.csv" />
+            <input id="priceInput" type="file" accept=".xlsx,.xls,.csv,.enc" />
           </div>
 
           
@@ -482,17 +482,17 @@ select:focus, input:focus{
       <div class="card" id="onlineCard" style="background:rgba(15,22,48,.35); border:1px dashed rgba(45,212,255,.35);">
         <div class="hd"><h2>Atualizar - Online</h2></div>
         <div class="bd">
-          <div class="note" style="margin-bottom:10px;">Este modo busca automaticamente os arquivos <span class="pn">base.xlsx</span> e <span class="pn">price.xlsx</span> no mesmo repositório (GitHub Pages) e carrega no dashboard.</div>
+          <div class="note" style="margin-bottom:10px;">Este modo busca automaticamente os arquivos <span class="pn">base.enc</span> e <span class="pn">price.enc</span> no mesmo repositório (GitHub Pages) e carrega no dashboard.</div>
           <div class="formGrid" style="grid-template-columns: 1fr 1fr;">
             <div>
               <label>URL BASE (auto)</label>
               <input id="baseUrlAuto" />
-              <small class="small">Padrão: <span class="pn">(site atual)/base.xlsx</span></small>
+              <small class="small">Padrão: <span class="pn">(site atual)/base.enc</span></small>
             </div>
             <div>
               <label>URL PREÇOS (auto)</label>
               <input id="priceUrlAuto" />
-              <small class="small">Padrão: <span class="pn">(site atual)/price.xlsx</span></small>
+              <small class="small">Padrão: <span class="pn">(site atual)/price.enc</span></small>
             </div>
           </div>
           <div style="height:10px"></div>
@@ -775,7 +775,7 @@ select:focus, input:focus{
 <script>
 'use strict';
 
-    // ===== Auto-load (GitHub Pages): base.xlsx + price.xlsx =====
+    // ===== Auto-load (GitHub Pages): base.enc + price.enc =====
     const AUTOURLKEY = 'pmp_autourl_v1';
 
     function getAutoCfg(){
@@ -812,12 +812,93 @@ select:focus, input:focus{
       return await res.arrayBuffer();
     }
 
+  // === PMPENC v1 (AES-GCM + PBKDF2) ===
+  // Formato do arquivo .enc (binário):
+  // 6 bytes  : ASCII "PMPENC"
+  // 1 byte   : versão (1)
+  // 4 bytes  : iterações PBKDF2 (uint32 BE)
+  // 16 bytes : salt
+  // 12 bytes : iv (AES-GCM)
+  // resto    : ciphertext (inclui tag GCM)
+  const PMPENC_MAGIC = new TextEncoder().encode('PMPENC');
+
+  function readU32BE(u8, off){
+    return ((u8[off]<<24) | (u8[off+1]<<16) | (u8[off+2]<<8) | (u8[off+3])) >>> 0;
+  }
+  function equalPrefix(u8, prefix){
+    if(u8.length < prefix.length) return false;
+    for(let i=0;i<prefix.length;i++) if(u8[i] !== prefix[i]) return false;
+    return true;
+  }
+
+  let _sessionPass = null;
+  async function getSessionPassword(){
+    if(_sessionPass) return _sessionPass;
+    const p = prompt('Senha para abrir BASE/PREÇOS (arquivo .enc):');
+    if(!p) throw new Error('Senha não informada.');
+    _sessionPass = p;
+    return _sessionPass;
+  }
+
+  async function deriveAesKeyFromPassword(password, salt, iterations){
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    return await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        hash: 'SHA-256',
+        salt,
+        iterations
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+  }
+
+  async function decryptPmpEncArrayBuffer(buf, password){
+    const u8 = new Uint8Array(buf);
+    if(!equalPrefix(u8, PMPENC_MAGIC)) throw new Error('Arquivo .enc inválido (assinatura PMPENC ausente).');
+    const version = u8[6];
+    if(version !== 1) throw new Error('Versão PMPENC não suportada: ' + version);
+
+    const iter = readU32BE(u8, 7);
+    const salt = u8.slice(11, 27);
+    const iv = u8.slice(27, 39);
+    const ct = u8.slice(39);
+
+    const key = await deriveAesKeyFromPassword(password, salt, iter);
+    try {
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+      return plain;
+    } catch (e) {
+      throw new Error('Senha incorreta ou arquivo corrompido.');
+    }
+  }
+
+  async function fetchWorkbookArrayBuffer(url){
+    const buf = await fetchArrayBuffer(url);
+    if(String(url).toLowerCase().endsWith('.enc')){
+      const pass = await getSessionPassword();
+      return await decryptPmpEncArrayBuffer(buf, pass);
+    }
+    return buf;
+  }
+
+
     async function loadBaseFromUrlAuto(url){
       const u = String(url||'').trim();
       if(!u) throw new Error('URL da BASE vazia.');
       setStatus('idle','Baixando BASE...');
       showAutoMsg('Baixando BASE...', 'idle');
-      const buf = await fetchArrayBuffer(u);
+      const buf = await fetchWorkbookArrayBuffer(u);
       const wb = XLSX.read(buf, { type:'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       let rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
@@ -839,7 +920,7 @@ select:focus, input:focus{
       if(!u) throw new Error('URL de PREÇOS vazia.');
       setStatus('idle','Baixando PREÇOS...');
       showAutoMsg('Baixando PREÇOS...', 'idle');
-      const buf = await fetchArrayBuffer(u);
+      const buf = await fetchWorkbookArrayBuffer(u);
       const wb = XLSX.read(buf, { type:'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
@@ -2599,8 +2680,8 @@ function initEquipSelection(){
       const baseEl = document.getElementById('baseUrlAuto');
       const priceEl = document.getElementById('priceUrlAuto');
 
-      const defBase = defaultRepoFileUrl('base.xlsx');
-      const defPrice = defaultRepoFileUrl('price.xlsx');
+      const defBase = defaultRepoFileUrl('base.enc');
+      const defPrice = defaultRepoFileUrl('price.enc');
 
       if(baseEl) baseEl.value = cfg.baseUrl || defBase;
       if(priceEl) priceEl.value = cfg.priceUrl || defPrice;
@@ -2655,7 +2736,7 @@ function initEquipSelection(){
           await loadBaseFromUrlAuto(String(baseEl?.value||''));
         }catch(e){
           // Não trava o app se o arquivo ainda não existe.
-          showAutoMsg('Não foi possível auto-carregar (verifique se base.xlsx e price.xlsx existem no repo).', 'err');
+          showAutoMsg('Não foi possível auto-carregar (verifique se base.enc e price.enc existem no repo).', 'err');
         }
       }, 450);
     })();
