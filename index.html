@@ -898,20 +898,19 @@ select:focus, input:focus{
   }
 
   async function fetchWorkbookArrayBuffer(url){
-      const raw = String(url||'');
+      const raw = String(url || '');
       const urlNoQuery = raw.split('?')[0].split('#')[0];
       const isEnc = urlNoQuery.toLowerCase().endsWith('.enc');
 
-      // Sempre pedir senha para Base.enc/Price.enc (mesmo que alguém salve URL diferente)
+      // Sempre pedir senha para Base.enc/Price.enc
       const forceEnc = /(?:^|\/)(?:Base|Price)\.enc(?:$|\?|#)/i.test(raw);
       const encMode = isEnc || forceEnc;
 
       const buf = await fetchArrayBuffer(raw);
       if(!encMode) return buf;
 
-      // Tenta descriptografar; se a senha estiver errada, pede novamente
       let lastErr = null;
-      for(let attempt=1; attempt<=3; attempt++){
+      for(let attempt = 1; attempt <= 3; attempt++){
         try{
           const pass = await getSessionPassword();
           return await decryptPmpEncArrayBuffer(buf, pass);
@@ -919,12 +918,23 @@ select:focus, input:focus{
           lastErr = e;
           const msg = (e && e.message) ? String(e.message) : String(e);
 
-          // Se for erro de senha/arquivo, libera para tentar de novo
-          if(/senha incorreta|corrompido|password/i.test(msg)){
+          // Cancelado pelo usuário: não tenta de novo
+          if(/cancelad|não informada/i.test(msg)){
+            throw e;
+          }
+
+          // Senha errada: limpa e pede novamente
+          if(/senha incorreta|corrompido/i.test(msg)){
             sessionPass = null;
             alert('Senha incorreta. Tente novamente.');
             continue;
           }
+
+          throw e;
+        }
+      }
+      throw (lastErr || new Error('Falha ao descriptografar.'));
+    }
 
           // Outros erros: não adianta repetir
           throw e;
