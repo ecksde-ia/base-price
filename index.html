@@ -812,11 +812,16 @@ select:focus, input:focus{
     }
 
     async function fetchArrayBuffer(url){
-      let u = String(url||'');
-      // Compatibilidade: se algum lugar ainda apontar para .xlsx, remapeia para .enc
-      u = u.replace(/base\.xlsx$/i, 'Base.enc').replace(/price\.xlsx$/i, 'Price.enc');
+      const raw = String(url||'');
+      const partsQ = raw.split('?');
+      const base = partsQ[0].split('#')[0];
+      const suffix = raw.slice(base.length); // inclui ?... e/ou #...
 
-      const res = await fetch(u, { method:'GET', cache:'no-store' });
+      // Compatibilidade: se algum lugar ainda apontar para .xlsx, remapeia para .enc
+      const mappedBase = base.replace(/base\.xlsx$/i, 'Base.enc').replace(/price\.xlsx$/i, 'Price.enc');
+      const finalUrl = mappedBase + suffix;
+
+      const res = await fetch(finalUrl, { method:'GET', cache:'no-store' });
       if(!res.ok) throw new Error('Falha ao baixar: ' + res.status + ' ' + res.statusText);
       return await res.arrayBuffer();
     }
@@ -893,12 +898,14 @@ select:focus, input:focus{
   }
 
   async function fetchWorkbookArrayBuffer(url){
-      const isEnc = String(url||'').toLowerCase().endsWith('.enc');
+      const raw = String(url||'');
+      const urlNoQuery = raw.split('?')[0].split('#')[0];
+      const isEnc = urlNoQuery.toLowerCase().endsWith('.enc');
 
       // Pede a senha antes do download (mantém o prompt ligado ao clique do usuário)
       const pass = isEnc ? await getSessionPassword() : null;
 
-      const buf = await fetchArrayBuffer(url);
+      const buf = await fetchArrayBuffer(raw);
       if(isEnc){
         return await decryptPmpEncArrayBuffer(buf, pass);
       }
