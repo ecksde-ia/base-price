@@ -482,17 +482,17 @@ select:focus, input:focus{
       <div class="card" id="onlineCard" style="background:rgba(15,22,48,.35); border:1px dashed rgba(45,212,255,.35);">
         <div class="hd"><h2>Atualizar - Online</h2></div>
         <div class="bd">
-          <div class="note" style="margin-bottom:10px;">Este modo busca automaticamente os arquivos <span class="pn">base.enc</span> e <span class="pn">price.enc</span> no mesmo repositório (GitHub Pages) e carrega no dashboard.</div>
+          <div class="note" style="margin-bottom:10px;">Este modo busca automaticamente os arquivos <span class="pn">Base.enc</span> e <span class="pn">Price.enc</span> no mesmo repositório (GitHub Pages) e carrega no dashboard.</div>
           <div class="formGrid" style="grid-template-columns: 1fr 1fr;">
             <div>
               <label>URL BASE (auto)</label>
               <input id="baseUrlAuto" />
-              <small class="small">Padrão: <span class="pn">(site atual)/base.enc</span></small>
+              <small class="small">Padrão: <span class="pn">(site atual)/Base.enc</span></small>
             </div>
             <div>
               <label>URL PREÇOS (auto)</label>
               <input id="priceUrlAuto" />
-              <small class="small">Padrão: <span class="pn">(site atual)/price.enc</span></small>
+              <small class="small">Padrão: <span class="pn">(site atual)/Price.enc</span></small>
             </div>
           </div>
           <div style="height:10px"></div>
@@ -775,7 +775,7 @@ select:focus, input:focus{
 <script>
 'use strict';
 
-    // ===== Auto-load (GitHub Pages): base.enc + price.enc =====
+    // ===== Auto-load (GitHub Pages): Base.enc + Price.enc =====
     const AUTOURLKEY = 'pmp_autourl_v1';
 
     function getAutoCfg(){
@@ -834,7 +834,7 @@ select:focus, input:focus{
   let _sessionPass = null;
   async function getSessionPassword(){
     if(_sessionPass) return _sessionPass;
-    const p = prompt('Senha para abrir BASE/PREÇOS (arquivo .enc):');
+    const p = prompt('Senha de acesso');
     if(!p) throw new Error('Senha não informada.');
     _sessionPass = p;
     return _sessionPass;
@@ -884,13 +884,17 @@ select:focus, input:focus{
   }
 
   async function fetchWorkbookArrayBuffer(url){
-    const buf = await fetchArrayBuffer(url);
-    if(String(url).toLowerCase().endsWith('.enc')){
-      const pass = await getSessionPassword();
-      return await decryptPmpEncArrayBuffer(buf, pass);
+      const isEnc = String(url||'').toLowerCase().endsWith('.enc');
+
+      // Pede a senha antes do download (mantém o prompt ligado ao clique do usuário)
+      const pass = isEnc ? await getSessionPassword() : null;
+
+      const buf = await fetchArrayBuffer(url);
+      if(isEnc){
+        return await decryptPmpEncArrayBuffer(buf, pass);
+      }
+      return buf;
     }
-    return buf;
-  }
 
 
     async function loadBaseFromUrlAuto(url){
@@ -2680,8 +2684,8 @@ function initEquipSelection(){
       const baseEl = document.getElementById('baseUrlAuto');
       const priceEl = document.getElementById('priceUrlAuto');
 
-      const defBase = defaultRepoFileUrl('base.enc');
-      const defPrice = defaultRepoFileUrl('price.enc');
+      const defBase = defaultRepoFileUrl('Base.enc');
+      const defPrice = defaultRepoFileUrl('Price.enc');
 
       if(baseEl) baseEl.value = cfg.baseUrl || defBase;
       if(priceEl) priceEl.value = cfg.priceUrl || defPrice;
@@ -2719,6 +2723,13 @@ function initEquipSelection(){
       document.getElementById('btnLoadBothAuto')?.addEventListener('click', async ()=>{
         try{
           persist();
+          // Garante que o prompt apareça no clique (antes dos awaits do fetch)
+          const _b = String(priceEl?.value||'');
+          const _a = String(baseEl?.value||'');
+          if(_a.toLowerCase().endsWith('.enc') || _b.toLowerCase().endsWith('.enc')){
+            await getSessionPassword();
+          }
+
           // preços primeiro para já calcular valores
           await loadPricesFromUrlAuto(String(priceEl?.value||''));
           await loadBaseFromUrlAuto(String(baseEl?.value||''));
@@ -2731,12 +2742,12 @@ function initEquipSelection(){
       // Auto-carrega ao abrir (se os arquivos existirem). Se quiser desativar, comente as linhas abaixo.
       setTimeout(async ()=>{
         try{
-          if(cfg.autoOnOpen === false) return;
+          if(cfg.autoOnOpen !== true) return;
           await loadPricesFromUrlAuto(String(priceEl?.value||''));
           await loadBaseFromUrlAuto(String(baseEl?.value||''));
         }catch(e){
           // Não trava o app se o arquivo ainda não existe.
-          showAutoMsg('Não foi possível auto-carregar (verifique se base.enc e price.enc existem no repo).', 'err');
+          showAutoMsg('Não foi possível auto-carregar (verifique se Base.enc e Price.enc existem no repo).', 'err');
         }
       }, 450);
     })();
