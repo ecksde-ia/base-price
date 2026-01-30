@@ -901,9 +901,11 @@ select:focus, input:focus{
       const raw = String(url||'');
       const urlNoQuery = raw.split('?')[0].split('#')[0];
       const isEnc = urlNoQuery.toLowerCase().endsWith('.enc');
+      console.log('[DEBUG] fetchWorkbookArrayBuffer raw=', raw, 'urlNoQuery=', urlNoQuery, 'isEnc=', isEnc);
 
       // Pede a senha antes do download (mantém o prompt ligado ao clique do usuário)
-      const pass = isEnc ? await getSessionPassword() : null;
+      const forceEnc = /(?:^|\/)(?:Base|Price)\.enc(?:$|\?|#)/i.test(raw);
+      const pass = (isEnc || forceEnc) ? await getSessionPassword() : null;
 
       const buf = await fetchArrayBuffer(raw);
       if(isEnc){
@@ -936,6 +938,7 @@ select:focus, input:focus{
     }
 
     async function loadPricesFromUrlAuto(url){
+      console.log('[DEBUG] loadPricesFromUrlAuto url=', url);
       const u = String(url||'').trim();
       if(!u) throw new Error('URL de PREÇOS vazia.');
       setStatus('idle','Baixando PREÇOS...');
