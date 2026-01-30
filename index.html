@@ -939,7 +939,7 @@ select:focus, input:focus{
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
       if(!rows.length) throw new Error('Tabela de preços vazia.');
       const normalized = rows.map(normalizePriceRow).filter(r => String(r.Referencia??'').trim().length);
-      if(!normalized.length) throw new Error('Não encontrei coluna Referencia/Part number e Preco.');
+      if(!normalized.length) throw new Error('Não encontrei colunas de referência/preço. Colunas encontradas: ' + Object.keys(rows[0]||{}).join(', '));
       setPrices(normalized);
       setStatus('ok','PREÇOS carregados ('+priceMap.size+' itens).');
       showAutoMsg('PREÇOS carregados.', 'ok');
@@ -1041,22 +1041,33 @@ function fmtBRL(n){
 }
 
 function normalizePriceRow(row){
-  const out = {};
-  for (const k in row) out[String(k).trim()] = row[k];
+      const out = {};
+      for(const k in row) out[String(k||'').trim()] = row[k];
 
-  const keyNorm = (k) =>
-    String(k).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+      const keys = Object.keys(out);
+      const norm = (s)=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
 
-  const refKey = Object.keys(out).find(k =>
-    ['referencia','ref','part number','partnumber','codigo','code'].includes(keyNorm(k))
-  );
+      // Campos possíveis para referência
+      const refCandidates = new Set([
+        'referencia','ref','part number','partnumber','pn','codigo','código','code','peca','peça'
+      ].map(norm));
 
-  const priceKey = Object.keys(out).find(k =>
-    ['preco','preco unitario','valor','price'].includes(keyNorm(k))
-  );
+      // Campos possíveis para preço
+      const priceCandidates = new Set([
+        'preco','preço','preco unitario','preço unitario','preco un','valor','price','unit price'
+      ].map(norm));
 
-  return { Referencia: out[refKey], Preco: out[priceKey] };
-}
+      const refKey = keys.find(k=>refCandidates.has(norm(k)));
+      const priceKey = keys.find(k=>priceCandidates.has(norm(k)));
+
+      // fallback: às vezes vem como "Part Number" (variação de caixa)
+      const refKey2 = refKey || keys.find(k=>norm(k)==='part number');
+
+      return {
+        Referencia: out[refKey2],
+        Preco: out[priceKey]
+      };
+    }
 
 function rebuildPriceMap(){
   priceMap = new Map();
