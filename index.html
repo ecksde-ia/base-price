@@ -801,9 +801,14 @@ select:focus, input:focus{
       const el = document.getElementById('autoLoadMsg');
       if(!el) return;
       el.style.display = 'inline';
-      el.style.color = (kind==='err') ? 'var(--bad)' : (kind==='ok' ? 'var(--good)' : 'var(--muted)');
-      el.textContent = msg;
-      if(kind!=='idle') setTimeout(()=>{ el.style.display='none'; }, 4500);
+      el.style.color = kind==='err' ? 'var(--bad)' : (kind==='ok' ? 'var(--good)' : 'var(--muted)');
+      el.textContent = String(msg||'');
+
+      // Debug visível (alguns ambientes não mostram console.error)
+      try{ console.log('[AUTO]', kind, msg); }catch(e){}
+
+      const ms = (kind==='err') ? 15000 : (kind==='ok' ? 6000 : 4500);
+      if(kind!=='idle') setTimeout(()=>{ el.style.display='none'; }, ms);
     }
 
     async function fetchArrayBuffer(url){
