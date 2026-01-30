@@ -936,15 +936,6 @@ select:focus, input:focus{
       throw (lastErr || new Error('Falha ao descriptografar.'));
     }
 
-          // Outros erros: não adianta repetir
-          throw e;
-        }
-      }
-      throw lastErr || new Error('Falha ao descriptografar.');
-    }
-      return buf;
-    }
-
 
     async function loadBaseFromUrlAuto(url){
       const u = String(url||'').trim();
