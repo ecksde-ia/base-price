@@ -2684,6 +2684,13 @@ function initEquipSelection(){
       const baseEl = document.getElementById('baseUrlAuto');
       const priceEl = document.getElementById('priceUrlAuto');
 
+
+      // Defaults (GitHub Pages): use .enc
+      try{
+        if(baseEl && !String(baseEl.value||'').trim()) baseEl.value = defaultRepoFileUrl('Base.enc');
+        if(priceEl && !String(priceEl.value||'').trim()) priceEl.value = defaultRepoFileUrl('Price.enc');
+      }catch(e){}
+
       const defBase = defaultRepoFileUrl('Base.enc');
       const defPrice = defaultRepoFileUrl('Price.enc');
 
