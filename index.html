@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Manutenção (Upload + Manutenções) - v5</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
@@ -846,13 +847,18 @@ select:focus, input:focus{
   }
 
   let _sessionPass = null;
-  async function getSessionPassword(){
-    if(_sessionPass) return _sessionPass;
-    const p = prompt('Senha de acesso');
-    if(!p) throw new Error('Senha não informada (cancelado).');
-    _sessionPass = p;
-    return _sessionPass;
-  }
+  async function getSessionPassword(forceReprompt=false){
+      if(sessionPass && !forceReprompt) return sessionPass;
+      const p = prompt('Senha de acesso');
+      if(!p){
+        try{ showAutoMsg('Atualização cancelada (senha não informada).', 'err'); }catch(_e){}
+        try{ setStatus('err', 'Senha não informada.'); }catch(_e){}
+        throw new Error('Senha não informada (cancelado).');
+      }
+      sessionPass = p;
+      return sessionPass;
+    }
+
 
   async function deriveAesKeyFromPassword(password, salt, iterations){
     const enc = new TextEncoder();
