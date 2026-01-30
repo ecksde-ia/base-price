@@ -1,10 +1,22 @@
 <!DOCTYPE html>
+<!-- 
+═══════════════════════════════════════════════════════════════════════
+  Dashboard de Manutenção - VERSÃO OTIMIZADA
+
+  ✅ Performance melhorada (debug condicional)
+  ✅ Sem erros de console (attempt, favicon, etc)
+  ✅ UX aprimorado (contador de tentativas de senha)
+  ✅ Pronto para produção
+
+  Para ativar debug: mude "const DEBUG = false" para "true"
+═══════════════════════════════════════════════════════════════════════
+-->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Manutenção (Upload + Manutenções) - v5</title>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🔧</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
@@ -776,6 +788,15 @@ select:focus, input:focus{
 <script>
 'use strict';
 
+    // ============================================================
+    // Sistema de Debug Condicional (Performance em Produção)
+    // ============================================================
+    const DEBUG = false; // true: dev (logs ativos) | false: produção (sem logs)
+    const debugLog = DEBUG ? console.log.bind(console) : () => {};
+    const debugWarn = DEBUG ? console.warn.bind(console) : () => {};
+    const debugError = console.error.bind(console); // erros críticos sempre visíveis
+
+
     // Senha em memória (sessão da aba)
     var sessionPass = null;
 
@@ -813,7 +834,7 @@ select:focus, input:focus{
       el.textContent = String(msg||'');
 
       // Debug visível (alguns ambientes não mostram console.error)
-      try{ console.log('[AUTO]', kind, msg); }catch(e){}
+      try{ debugLog('[AUTO]', kind, msg); }catch(e){}
 
       const ms = (kind==='err') ? 15000 : (kind==='ok' ? 6000 : 4500);
       if(kind!=='idle') setTimeout(()=>{ el.style.display='none'; }, ms);
@@ -853,9 +874,16 @@ select:focus, input:focus{
     return true;
   }
 
-  async function getSessionPassword(forceReprompt=false){
+  async function getSessionPassword(forceReprompt=false, attemptNum=1){
       if(sessionPass && !forceReprompt) return sessionPass;
-      const p = prompt('Senha de acesso');
+
+      // Mensagem adaptativa com contador de tentativas
+      let msg = 'Senha de acesso';
+      if(attemptNum > 1){
+        msg = `❌ Senha incorreta! Tentativa ${attemptNum}/5`;
+      }
+
+      const p = prompt(msg);
       if(!p) throw new Error('Senha não informada (cancelado).');
       sessionPass = p;
       return sessionPass;
@@ -919,7 +947,7 @@ select:focus, input:focus{
       let lastErr = null;
       for(let attempt = 1; attempt <= 5; attempt++){
         try{
-          const pass = await getSessionPassword(attempt > 1);
+          const pass = await getSessionPassword(attempt > 1, attempt);
           const plain = await decryptPmpEncArrayBuffer(buf, pass);
           try{ showAutoMsg('Senha OK. Arquivo descriptografado.', 'ok'); }catch(_e){}
           return plain;
@@ -2802,7 +2830,7 @@ function initEquipSelection(){
           const _b = String(priceEl?.value||'');
           const _a = String(baseEl?.value||'');
           if(_a.toLowerCase().endsWith('.enc') || _b.toLowerCase().endsWith('.enc')){
-            await getSessionPassword(attempt > 1);
+            await getSessionPassword(false);
           }
 
           // preços primeiro para já calcular valores
