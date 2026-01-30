@@ -807,8 +807,12 @@ select:focus, input:focus{
     }
 
     async function fetchArrayBuffer(url){
-      const res = await fetch(url, { method:'GET', cache:'no-store' });
-      if(!res.ok) throw new Error('Falha ao baixar ('+res.status+'): ' + (res.statusText||'erro'));
+      let u = String(url||'');
+      // Compatibilidade: se algum lugar ainda apontar para .xlsx, remapeia para .enc
+      u = u.replace(/base\.xlsx$/i, 'Base.enc').replace(/price\.xlsx$/i, 'Price.enc');
+
+      const res = await fetch(u, { method:'GET', cache:'no-store' });
+      if(!res.ok) throw new Error('Falha ao baixar: ' + res.status + ' ' + res.statusText);
       return await res.arrayBuffer();
     }
 
