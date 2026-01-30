@@ -780,6 +780,9 @@ select:focus, input:focus{
     var sessionPass = null;
 
 
+    // Senha em memória (sessão da aba)
+
+
     // ===== Auto-load (GitHub Pages): Base.enc + Price.enc =====
     const AUTOURLKEY = 'pmp_autourl_v1';
 
@@ -850,25 +853,15 @@ select:focus, input:focus{
     return true;
   }
 
-  let _sessionPass = null;
   async function getSessionPassword(forceReprompt=false){
       if(sessionPass && !forceReprompt) return sessionPass;
       const p = prompt('Senha de acesso');
-      if(!p){
-        try{ showAutoMsg('Atualização cancelada (senha não informada).', 'err'); }catch(_e){}
-        try{ setStatus('err', 'Senha não informada.'); }catch(_e){}
-        throw new Error('Senha não informada (cancelado).');
-      }
+      if(!p) throw new Error('Senha não informada (cancelado).');
       sessionPass = p;
       return sessionPass;
     }
 
-      sessionPass = p;
-      return sessionPass;
-    }
-
-
-  async function deriveAesKeyFromPassword(password, salt, iterations){
+    async function deriveAesKeyFromPassword(password, salt, iterations){
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
@@ -2809,7 +2802,7 @@ function initEquipSelection(){
           const _b = String(priceEl?.value||'');
           const _a = String(baseEl?.value||'');
           if(_a.toLowerCase().endsWith('.enc') || _b.toLowerCase().endsWith('.enc')){
-            await getSessionPassword();
+            await getSessionPassword(attempt > 1);
           }
 
           // preços primeiro para já calcular valores
