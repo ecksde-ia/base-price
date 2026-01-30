@@ -910,31 +910,38 @@ select:focus, input:focus{
       if(!encMode) return buf;
 
       let lastErr = null;
-      for(let attempt = 1; attempt <= 3; attempt++){
+      for(let attempt = 1; attempt <= 5; attempt++){
         try{
-          const pass = await getSessionPassword();
-          return await decryptPmpEncArrayBuffer(buf, pass);
+          const pass = await getSessionPassword(attempt > 1);
+          const plain = await decryptPmpEncArrayBuffer(buf, pass);
+          try{ showAutoMsg('Senha OK. Arquivo descriptografado.', 'ok'); }catch(_e){}
+          return plain;
         }catch(e){
           lastErr = e;
           const msg = (e && e.message) ? String(e.message) : String(e);
 
-          // Cancelado pelo usuário: não tenta de novo
+          // Cancelado
           if(/cancelad|não informada/i.test(msg)){
-            try{ showAutoMsg(msg, 'err'); }catch(_e){}
-            try{ setStatus('err', msg); }catch(_e){}
+            try{ showAutoMsg('Atualização cancelada (senha não informada).', 'err'); }catch(_e){}
+            try{ setStatus('err', 'Senha não informada.'); }catch(_e){}
             throw e;
           }
 
-          // Senha errada: limpa e pede novamente
+          // Senha errada: mostra na UI e repete
           if(/senha incorreta|corrompido/i.test(msg)){
             sessionPass = null;
-            alert('Senha incorreta. Tente novamente.');
+            try{ showAutoMsg('Senha incorreta. Tente novamente.', 'err'); }catch(_e){}
+            try{ setStatus('err', 'Senha incorreta.'); }catch(_e){}
             continue;
           }
 
+          try{ showAutoMsg(msg, 'err'); }catch(_e){}
+          try{ setStatus('err', msg); }catch(_e){}
           throw e;
         }
       }
+      try{ showAutoMsg('Falha ao descriptografar (muitas tentativas).', 'err'); }catch(_e){}
+      try{ setStatus('err', 'Falha ao descriptografar.'); }catch(_e){}
       throw (lastErr || new Error('Falha ao descriptografar.'));
     }
 
