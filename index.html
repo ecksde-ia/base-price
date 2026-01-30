@@ -920,6 +920,8 @@ select:focus, input:focus{
 
           // Cancelado pelo usuário: não tenta de novo
           if(/cancelad|não informada/i.test(msg)){
+            try{ showAutoMsg(msg, 'err'); }catch(_e){}
+            try{ setStatus('err', msg); }catch(_e){}
             throw e;
           }
 
