@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard Manutenção (Upload + Manutenções) - v5</title>
+  <title>Dashboard Manutenção - v1</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🔧</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -437,6 +437,89 @@ select:focus, input:focus{
     .discountInput:focus{border-color:rgba(45,212,255,.85);box-shadow:0 0 0 3px rgba(45,212,255,.12)}
     .priceStrike{color:var(--muted);text-decoration:line-through;font-size:11px;margin-right:6px}
     .priceFinal{color:var(--good);font-weight:700}
+
+    /* Online card: theme-consistent background (avoid dark inline style leaking into light theme) */
+    #onlineCard{background:rgba(15,22,48,.35);border:1px dashed rgba(45,212,255,.35)}
+    :root[data-theme="light"] #onlineCard{background:rgba(255,255,255,.92);border:1px dashed rgba(17,24,39,.25)}
+  
+    /* Online card: match Upload boxes style (theme-consistent) */
+    #onlineCard{
+      border:2px dashed rgba(45,212,255,.35);
+      background:linear-gradient(180deg, rgba(45,212,255,.06), rgba(18,26,51,.65));
+    }
+    :root[data-theme="light"] #onlineCard{
+      border-color:rgba(17,24,39,.22);
+      background:linear-gradient(180deg, rgba(17,24,39,.03), rgba(255,255,255,.92));
+    }
+  
+    /* Online card: match Upload boxes (no header divider, same padding/visual) */
+    #onlineCard{
+      border:2px dashed rgba(45,212,255,.35);
+      background:linear-gradient(180deg, rgba(45,212,255,.06), rgba(18,26,51,.65));
+      padding:16px;
+      border-radius:var(--radius);
+      box-shadow:none;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+    }
+    #onlineCard .hd{
+      padding:0;
+      border-bottom:none;
+      margin:0 0 10px 0;
+      display:block;
+    }
+    #onlineCard .hd h2{
+      font-size:16px;
+      text-transform:none;
+      letter-spacing:0;
+      color:var(--text);
+    }
+    #onlineCard .bd{
+      padding:0;
+    }
+    :root[data-theme="light"] #onlineCard{
+      border-color:rgba(17,24,39,.22);
+      background:linear-gradient(180deg, rgba(17,24,39,.03), rgba(255,255,255,.92));
+    }
+  
+    /* Online card: compact layout (fix excess blank space esp. in light theme) */
+    #onlineCard .hd h2{
+      margin:0;
+      font-weight:800;
+      line-height:1.2;
+    }
+    /* Remove spacer divs inside onlineCard body to match the Upload boxes vertical rhythm */
+    #onlineCard .bd > div[style^="height"],
+    #onlineCard .bd > div[style^="height:"]{
+      display:none !important;
+    }
+    /* Keep the button close to the title */
+    #onlineCard .toolbar{
+      margin-top:0;
+      padding-top:0;
+    }
+
+    /* Modal: prevent clipping on small viewports */
+    .modal{
+      overflow:auto;
+      align-items:flex-start;
+      justify-content:center;
+      padding:18px;
+    }
+    .modal.show{
+      overflow:auto;
+    }
+    .modalCard{
+      max-height:calc(100vh - 36px);
+      display:flex;
+      flex-direction:column;
+      margin:auto 0;
+    }
+    .modalBd{
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+
 </style>
 
   <!-- PDF Export libs -->
@@ -488,7 +571,7 @@ select:focus, input:focus{
           
       <div style="height:12px"></div>
 
-      <div class="card" id="onlineCard" style="background:rgba(15,22,48,.35); border:1px dashed rgba(45,212,255,.35);">
+      <div class="card" id="onlineCard">
         <div class="hd"><h2>Atualizar - Online</h2></div>
         <div class="bd">
           <div class="note" style="margin-bottom:10px;">Este modo busca automaticamente os arquivos <span class="pn">Base.enc</span> e <span class="pn">Price.enc</span> no mesmo repositório (GitHub Pages) e carrega no dashboard.</div>
@@ -632,7 +715,7 @@ select:focus, input:focus{
         </div>
       </div>
       <div class="modalBd">
-        <div class="note" style="margin-bottom:10px">Esta tela gera uma proposta com base no modelo + horas inicial/final e na tabela de preços carregada.</div>
+        <div class="note" style="margin-bottom:10px">Tela para criar proposta de PMP (Plano de manutenção).</div>
 
         <div class="small" style="margin:10px 0 6px">Dados do cliente</div>
         <div class="formGrid">
@@ -685,13 +768,13 @@ select:focus, input:focus{
     <input id="pSelectItemsMode" type="checkbox">
     <span>Selecionar itens antes de exportar (PDF)</span>
   </label>
-  <small class="small checkHint">Se marcado, será exibida uma lista para marcar/desmarcar itens antes de gerar o PDF.</small>
+  <small class="small checkHint">Abre uma janela com todos os itens para seleção antes de gerar o PDF.</small>
 
       <label class="checkLine" for="pApplyDiscounts">
         <input id="pApplyDiscounts" type="checkbox" />
         <span>Aplicar descontos individuais nas peças</span>
       </label>
-      <small class="small checkHint">Se marcado, abrirá um modal antes do PDF para informar desconto (%) por item.</small>
+      <small class="small checkHint">Abre uma janela com todos os itens para informar desconto em % por item antes de gerar o PDF.</small>
 
         <label class="checkLine" for="pIncludeTimestamp">
           <input id="pIncludeTimestamp" type="checkbox" checked>
@@ -1055,7 +1138,7 @@ select:focus, input:focus{
     }
 
     async function loadPricesFromUrlAuto(url){
-      debugLog('[DEBUG] loadPricesFromUrlAuto url=', url);
+      console.log('[DEBUG] loadPricesFromUrlAuto url=', url);
       const u = String(url||'').trim();
       if(!u) throw new Error('URL de PREÇOS vazia.');
       setStatus('idle','Baixando PREÇOS...');
@@ -2198,7 +2281,15 @@ updateMaintCount();
 
   const BENEFICIOS = ['Flexibilidade no pagamento em até 10 parcelas, melhorando o fluxo de caixa do cliente.','Previsibilidade no custo das manutenções preventivas.','Prioridade em atendimentos para manutenções corretivas.','Leitura Matris comentada em todas as revisões múltiplas de 1000 horas.','Análise de óleo comentada a cada 1.0000 horas.','Medição do material rodante a cada 1000 horas para equipamentos até 22 toneladas, acima, a cada 2000 horas.','Maior disponibilidade mecânica do equipamento por conta das manutenções preventivas.','Atendimento com equipe treinada e capacitada pelo fabricante.','Análise de desconto em componentes via Fabricante para as máquinas que tem acordo vigente'];
 
-  
+  function esc(x){
+    return String(x ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#039;');
+  }
+
   function safeNum(x){
     if (x === null || x === undefined) return 0;
     const s = String(x).trim().replaceAll('R$','').replaceAll('.', '').replaceAll(',', '.');
@@ -2484,7 +2575,68 @@ const hourCount = (hourNs || []).length;
           .benef .bn{ display:inline-block; width:18px; font-weight:700; }
           .sig{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
           .sigline{ border-top:1px solid #111; margin-top:28px; }
-        </style>
+        
+    /* Online card: theme-consistent background (avoid dark inline style leaking into light theme) */
+    #onlineCard{background:rgba(15,22,48,.35);border:1px dashed rgba(45,212,255,.35)}
+    :root[data-theme="light"] #onlineCard{background:rgba(255,255,255,.92);border:1px dashed rgba(17,24,39,.25)}
+  
+    /* Online card: match Upload boxes style (theme-consistent) */
+    #onlineCard{
+      border:2px dashed rgba(45,212,255,.35);
+      background:linear-gradient(180deg, rgba(45,212,255,.06), rgba(18,26,51,.65));
+    }
+    :root[data-theme="light"] #onlineCard{
+      border-color:rgba(17,24,39,.22);
+      background:linear-gradient(180deg, rgba(17,24,39,.03), rgba(255,255,255,.92));
+    }
+  
+    /* Online card: match Upload boxes (no header divider, same padding/visual) */
+    #onlineCard{
+      border:2px dashed rgba(45,212,255,.35);
+      background:linear-gradient(180deg, rgba(45,212,255,.06), rgba(18,26,51,.65));
+      padding:16px;
+      border-radius:var(--radius);
+      box-shadow:none;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+    }
+    #onlineCard .hd{
+      padding:0;
+      border-bottom:none;
+      margin:0 0 10px 0;
+      display:block;
+    }
+    #onlineCard .hd h2{
+      font-size:16px;
+      text-transform:none;
+      letter-spacing:0;
+      color:var(--text);
+    }
+    #onlineCard .bd{
+      padding:0;
+    }
+    :root[data-theme="light"] #onlineCard{
+      border-color:rgba(17,24,39,.22);
+      background:linear-gradient(180deg, rgba(17,24,39,.03), rgba(255,255,255,.92));
+    }
+  
+    /* Online card: compact layout (fix excess blank space esp. in light theme) */
+    #onlineCard .hd h2{
+      margin:0;
+      font-weight:800;
+      line-height:1.2;
+    }
+    /* Remove spacer divs inside onlineCard body to match the Upload boxes vertical rhythm */
+    #onlineCard .bd > div[style^="height"],
+    #onlineCard .bd > div[style^="height:"]{
+      display:none !important;
+    }
+    /* Keep the button close to the title */
+    #onlineCard .toolbar{
+      margin-top:0;
+      padding-top:0;
+    }
+  </style>
 
         <div class="pdfTop" style="display:none">
           <div class="pdfLogo"><div class="pdfLogoSpace"></div></div>
@@ -2736,7 +2888,7 @@ async function exportProposalPDF(){
           if (base64) logoImg.src = base64;
         }
       } catch(e) {
-        debugWarn('Logo não convertido (CORS/Fetch):', e);
+        console.warn('Logo não convertido (CORS/Fetch):', e);
       }
 
       const node = printArea.firstElementChild;
