@@ -1,16 +1,5 @@
 <!DOCTYPE html>
-<!-- 
-═══════════════════════════════════════════════════════════════════════
-  Dashboard de Manutenção - VERSÃO OTIMIZADA
 
-  ✅ Performance melhorada (debug condicional)
-  ✅ Sem erros de console (attempt, favicon, etc)
-  ✅ UX aprimorado (contador de tentativas de senha)
-  ✅ Pronto para produção
-
-  Para ativar debug: mude "const DEBUG = false" para "true"
-═══════════════════════════════════════════════════════════════════════
--->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -225,13 +214,13 @@
   --focus: rgba(45,212,255,.22);
 }
 
-/* Dark: slightly higher contrast for muted text & borders */
+/* Dark */
 :root{
   --muted: #b6c6e3;
   --border: #2f3d6a;
 }
 
-/* Light (industrial): graphite header + clean cards */
+/* Light */
 :root[data-theme="light"]{
   --bg: #eef1f5;
   --surface: #ffffff;
@@ -247,7 +236,7 @@
   --shadow: 0 12px 28px rgba(17,24,39,.12);
 }
 
-/* Backgrounds per theme */
+/* Background */
 body{
   background:
     radial-gradient(900px 500px at 15% 0%, rgba(45,212,255,.12), transparent 60%),
@@ -261,12 +250,12 @@ body{
     var(--bg);
 }
 
-/* Make sections breathe */
+/* Breathe */
 .wrap{ padding: 26px; }
 .card .bd{ padding: 16px; }
 .card .hd{ padding: 14px 16px; }
 
-/* Inputs: better focus */
+/* Focus */
 select:focus, input:focus{
   border-color: rgba(45,212,255,.85);
   box-shadow: 0 0 0 3px var(--focus);
@@ -277,14 +266,14 @@ select:focus, input:focus{
   box-shadow: 0 0 0 3px rgba(17,24,39,.10);
 }
 
-/* Light theme: fix inputs/selects background (base CSS is dark) */
+/* Light theme */
 :root[data-theme="light"] select,
 :root[data-theme="light"] input{
   background: #ffffff;
   color: var(--text);
 }
 
-/* Buttons: clearer hierarchy */
+/* Buttons */
 .btn{
   transition: transform .08s ease, border-color .15s ease, background .15s ease, opacity .15s ease;
 }
@@ -295,7 +284,7 @@ select:focus, input:focus{
   color: #fff;
 }
 
-/* Table readability: zebra + stronger header */
+/* Table */
 .table thead th{ background: rgba(18,26,51,.98); }
 :root[data-theme="light"] .table thead th{
   background: #111827;
@@ -306,7 +295,7 @@ select:focus, input:focus{
 .table tbody tr:hover{ background: rgba(45,212,255,.08); }
 :root[data-theme="light"] .table tbody tr:hover{ background: rgba(17,24,39,.07); }
 
-/* Logo bar: readable in both themes */
+/* Logo bar */
 .logoBar{ padding: 18px 0 10px 0; background: transparent; }
 .logoPlate{
   display: inline-flex;
@@ -363,7 +352,7 @@ select:focus, input:focus{
 :root:not([data-theme="light"]) .logoPlate img{
   filter: invert(1) brightness(1.05) drop-shadow(0 10px 22px rgba(45,212,255,.14));
 }
-/* Industrial light: make the top sticky bar graphite */
+/* Industrial light */
 :root[data-theme="light"] .topBar{
   background: #111827 !important;
   border-bottom: 1px solid rgba(17,24,39,.25) !important;
@@ -376,14 +365,14 @@ select:focus, input:focus{
   border-color: rgba(255,255,255,.45) !important;
 }
 
-/* Light theme: cards less translucent to look cleaner */
+/* Light theme */
 :root[data-theme="light"] .card,
 :root[data-theme="light"] .header{
   background: rgba(255,255,255,.92);
   backdrop-filter: blur(8px);
 }
 
-/* Light theme: modal must also be light (base modal is dark) */
+/* Light theme */
 :root[data-theme="light"] .modalCard{
   background: rgba(255,255,255,.96);
 }
@@ -402,7 +391,7 @@ select:focus, input:focus{
 }
 
 
-/* Light theme: fix dark blocks */
+/* Light theme */
 :root[data-theme="light"] .pill{
   background: rgba(255,255,255,.92);
   color: var(--muted);
@@ -432,7 +421,7 @@ select:focus, input:focus{
 }
 
 
-/* Chart selection checkbox (Peças) */
+/* Selection (Peças) */
 .chartItemChk{ width:18px; height:18px; cursor:pointer; accent-color: var(--primary); }
 
 
@@ -702,13 +691,13 @@ select:focus, input:focus{
         <input id="pApplyDiscounts" type="checkbox" />
         <span>Aplicar descontos individuais nas peças</span>
       </label>
-      <small class="small checkHint">Se marcado, abrirá um modal antes do PDF para informar desconto (%) por item. O desconto aplica somente nas peças (taxa de atendimento não muda) e os valores são arredondados para 2 casas.</small>
+      <small class="small checkHint">Se marcado, abrirá um modal antes do PDF para informar desconto (%) por item.</small>
 
         <label class="checkLine" for="pIncludeTimestamp">
           <input id="pIncludeTimestamp" type="checkbox" checked>
           <span>Incluir timestamp ("Emitido em...") no PDF</span>
         </label>
-        <small class="small checkHint">Se desmarcado, o PDF será gerado sem a linha de emissão (layout preservado).</small>
+        <small class="small checkHint">Se desmarcado, o PDF será gerado sem a linha de emissão.</small>
 </div>
 
 <label>Troca de óleo hidráulico (tempo padrão)</label>
@@ -879,8 +868,8 @@ select:focus, input:focus{
     function defaultRepoFileUrl(fileName){
       try{
         const u = new URL(window.location.href);
-        // If on /index.html, keep same folder; if on /something/, keep it.
-        // We always point to same directory level.
+        // Patchname Index.
+        // Base.
         const basePath = u.pathname.endsWith('/') ? u.pathname : u.pathname.replace(/\/[^\/]*$/, '/');
         return u.origin + basePath + fileName;
       }catch(e){
