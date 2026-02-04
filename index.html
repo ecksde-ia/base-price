@@ -449,7 +449,7 @@ select:focus, input:focus{
   <!-- Logo Nors -->
 <div class="logoBar" style="text-align:center;">
   <div class="logoPlate">
-    <img src="https://nors.basepro.net/relatorios/img/Nors.png" alt="Nors Logo">
+    <img src="Nors.png" alt="Nors Logo">
   </div>
 </div>
 <div class="wrap">
@@ -1055,7 +1055,7 @@ select:focus, input:focus{
     }
 
     async function loadPricesFromUrlAuto(url){
-      console.log('[DEBUG] loadPricesFromUrlAuto url=', url);
+      debugLog('[DEBUG] loadPricesFromUrlAuto url=', url);
       const u = String(url||'').trim();
       if(!u) throw new Error('URL de PREÇOS vazia.');
       setStatus('idle','Baixando PREÇOS...');
@@ -2198,15 +2198,7 @@ updateMaintCount();
 
   const BENEFICIOS = ['Flexibilidade no pagamento em até 10 parcelas, melhorando o fluxo de caixa do cliente.','Previsibilidade no custo das manutenções preventivas.','Prioridade em atendimentos para manutenções corretivas.','Leitura Matris comentada em todas as revisões múltiplas de 1000 horas.','Análise de óleo comentada a cada 1.0000 horas.','Medição do material rodante a cada 1000 horas para equipamentos até 22 toneladas, acima, a cada 2000 horas.','Maior disponibilidade mecânica do equipamento por conta das manutenções preventivas.','Atendimento com equipe treinada e capacitada pelo fabricante.','Análise de desconto em componentes via Fabricante para as máquinas que tem acordo vigente'];
 
-  function esc(x){
-    return String(x ?? '')
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'",'&#039;');
-  }
-
+  
   function safeNum(x){
     if (x === null || x === undefined) return 0;
     const s = String(x).trim().replaceAll('R$','').replaceAll('.', '').replaceAll(',', '.');
@@ -2744,7 +2736,7 @@ async function exportProposalPDF(){
           if (base64) logoImg.src = base64;
         }
       } catch(e) {
-        console.warn('Logo não convertido (CORS/Fetch):', e);
+        debugWarn('Logo não convertido (CORS/Fetch):', e);
       }
 
       const node = printArea.firstElementChild;
