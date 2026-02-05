@@ -561,6 +561,7 @@ select:focus, input:focus{
           <h2>Carregar e filtrar</h2>
           <div class="toolbar">
             <button class="btn" id="btnMaintenance" type="button">Cadastrar proposta</button>
+            <button class="btn btnPrimary" id="btnFenix" type="button">Gerar arquivo Fênix</button>
 <button class="btn" id="btnClear" type="button">Limpar</button>
           </div>
         </div>
@@ -848,6 +849,46 @@ select:focus, input:focus{
 </div></div>
 
 
+
+
+<!-- Modal: Gerar arquivo Fênix -->
+<div class="modal" id="fenixModal" aria-hidden="true">
+  <div class="modalCard" style="width:min(820px, 100%);">
+    <div class="modalHd">
+      <h3>Gerar arquivo Fênix</h3>
+      <button class="xBtn" type="button" id="btnFenixClose">Fechar</button>
+    </div>
+    <div class="modalBd">
+      <div class="formGrid" style="display:grid;grid-template-columns:1fr;gap:12px;">
+        <div>
+          <label>Modelo</label>
+          <select id="fenixModel">
+            <option value="">-- Selecione um modelo --</option>
+          </select>
+        </div>
+        <div class="formGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label>Horas: Inicial</label>
+            <select id="fenixHourStart">
+              <option value="">-- Selecione --</option>
+            </select>
+          </div>
+          <div>
+            <label>Horas: Final</label>
+            <select id="fenixHourEnd">
+              <option value="">-- Selecione --</option>
+            </select>
+          </div>
+        </div>
+        <div class="note">A exportação considera a soma das colunas de horas dentro do intervalo selecionado (Inicial até Final).</div>
+      </div>
+    </div>
+    <div class="toolbar" style="justify-content:flex-end;padding:12px 14px;border-top:1px solid var(--border);">
+      <button class="btn" type="button" id="btnFenixCancel">Cancelar</button>
+      <button class="btn btnPrimary" type="button" id="btnFenixGenerate">Gerar arquivo</button>
+    </div>
+  </div>
+</div>
 <!-- Modal: Seleção de Itens do PDF -->
 <div class="modal" id="selectItemsModal" aria-hidden="true">
   <div class="modalCard" style="width:min(980px, 100%);">
@@ -2507,7 +2548,7 @@ const hourCount = (hourNs || []).length;
       const isNum = (typeof h === 'number' && Number.isFinite(h));
       const label = isNum ? `${h}h` : String(h);
       const w = isNum ? 58 : 110;
-      const ta = isNum ? 'right' : 'center';
+      const ta = isNum ? 'center' : 'center';
       return `<th style="width:${w}px; text-align:${ta};">${esc(label)}</th>`;
     }).join('');
 
@@ -2519,7 +2560,7 @@ const hourCount = (hourNs || []).length;
       const cols = (hourNs || []).map(h => {
         const v = Number(it.hours?.[h] ?? 0);
         const vTxt = (Number.isFinite(v) && Math.abs(v) > 0) ? Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '';
-        return `<td style="text-align:right;">${vTxt}</td>`;
+        return `<td style="text-align:center;">${vTxt}</td>`;
       }).join('');
 
       const q = Number(it.qtyTotal ?? 0);
@@ -3304,6 +3345,149 @@ function initEquipSelection(){
         }
       }, 450);
     })();
+
+
+// ========== FÊNIX EXPORT (XLSX) ==========
+function openFenixModal(){
+  const modal = document.getElementById('fenixModal');
+  if(!modal) return;
+
+  const data = Array.isArray(allData) ? allData : [];
+
+  // Modelo
+  const modelSelect = document.getElementById('fenixModel');
+  if(modelSelect){
+    modelSelect.innerHTML = '<option value="">-- Selecione um modelo --</option>';
+    const models = [...new Set(data.map(r => r && r['Modelo']))].filter(v => v && String(v).trim().length).sort();
+    for(const m of models){
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      modelSelect.appendChild(opt);
+    }
+  }
+
+  // Horas
+  populateFenixHours();
+
+  // IMPORTANT: modais deste sistema usam class .show para exibir
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden','false');
+}
+
+function closeFenixModal(){
+  const modal = document.getElementById('fenixModal');
+  if(!modal) return;
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden','true');
+}
+
+function populateFenixHours(){
+  const startSelect = document.getElementById('fenixHourStart');
+  const endSelect = document.getElementById('fenixHourEnd');
+  if(!startSelect || !endSelect) return;
+
+  startSelect.innerHTML = '<option value="">-- Selecione --</option>';
+  endSelect.innerHTML = '<option value="">-- Selecione --</option>';
+
+  const data = Array.isArray(allData) ? allData : [];
+  if(!data.length) return;
+
+  const keys = Object.keys(data[0] || {});
+  const hourNums = keys
+    .map(k => String(k).trim())
+    .map(k => ({ k, n: Number(k) }))
+    .filter(x => Number.isFinite(x.n) && String(x.n) === x.k)
+    .map(x => x.n)
+    .sort((a,b) => a-b);
+
+  for(const n of hourNums){
+    const opt1 = document.createElement('option');
+    opt1.value = String(n);
+    opt1.textContent = `${n} horas`;
+    startSelect.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = String(n);
+    opt2.textContent = `${n} horas`;
+    endSelect.appendChild(opt2);
+  }
+}
+
+function numx(x){
+  const n = Number(String(x ?? 0).replace(',','.'));
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function generateFenixFile(){
+  const data = Array.isArray(allData) ? allData : [];
+
+  const model = String(document.getElementById('fenixModel')?.value || '').trim();
+  const hStart = Number(document.getElementById('fenixHourStart')?.value || 0);
+  const hEnd = Number(document.getElementById('fenixHourEnd')?.value || 0);
+
+  if(!model){ alert('Selecione um modelo'); return; }
+  if(!hStart || !hEnd){ alert('Selecione as horas inicial e final'); return; }
+  if(hStart > hEnd){ alert('Hora inicial deve ser menor ou igual à hora final'); return; }
+
+  const filtered = data.filter(r => String(r?.['Modelo'] ?? '') === model);
+  if(!filtered.length){ alert('Nenhum dado encontrado para o modelo selecionado'); return; }
+
+  const keys = Object.keys(filtered[0] || {});
+  const hourNums = keys
+    .map(k => String(k).trim())
+    .map(k => ({ k, n: Number(k) }))
+    .filter(x => Number.isFinite(x.n) && String(x.n) === x.k)
+    .map(x => x.n)
+    .filter(n => n >= hStart && n <= hEnd)
+    .sort((a,b) => a-b);
+
+  if(!hourNums.length){ alert('Nenhuma coluna de horas no intervalo selecionado'); return; }
+
+  const agg = new Map();
+
+  for(const r of filtered){
+    const pn = String(r?.['Part number'] ?? r?.['Part Number'] ?? '').trim();
+    if(!pn) continue;
+
+    let total = 0;
+    for(const h of hourNums){
+      total += numx(r?.[h]);
+    }
+
+    if(total > 0){
+      agg.set(pn, (agg.get(pn) || 0) + total);
+    }
+  }
+
+  if(!agg.size){ alert('Nenhum item com quantidade no intervalo selecionado'); return; }
+
+  const rows = [['Quantidade', 'Part Number']];
+  // ordena por Part Number
+  const entries = [...agg.entries()].sort((a,b) => String(a[0]).localeCompare(String(b[0])));
+  for(const [pn, qty] of entries){
+    rows.push([qty, pn]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Fenix');
+
+  const safeModel = model.replace(/[^a-z0-9\-_ ]/gi,'_').trim().replace(/\s+/g,'_');
+  const fileName = `Fenix_${safeModel}_${hStart}h-${hEnd}h.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  closeFenixModal();
+}
+
+// Listeners (garante que o DOM exista)
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btnFenix')?.addEventListener('click', openFenixModal);
+  document.getElementById('btnFenixClose')?.addEventListener('click', closeFenixModal);
+  document.getElementById('btnFenixCancel')?.addEventListener('click', closeFenixModal);
+  document.getElementById('btnFenixGenerate')?.addEventListener('click', generateFenixFile);
+});
+
 </script>
 
 </body>
