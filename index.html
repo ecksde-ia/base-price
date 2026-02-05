@@ -2537,13 +2537,24 @@ const hourCount = (hourNs || []).length;
     const html = `
       <div class="pdfPage">
         <style>
-          .pdfPage{ font-family: Arial, Helvetica, sans-serif; color:#111; background:#fff; padding:14px; box-sizing:border-box; }
+          .pdfPage{
+            font-family: Arial, Helvetica, sans-serif;
+            color:#111;
+            background:#fff;
+            padding:10px;
+            box-sizing:border-box;
+          }
           .pdfPage.compact{ font-size:10px; }
           .pdfPage.compact table{ font-size:10px; }
           .pdfPage.compact th, .pdfPage.compact td{ padding:5px 5px; }
           .pdfPage.compact .h2{ font-size:11px; }
           .pdfPage.compact .muted{ font-size:10px; }
-          .pdfTop{ display:grid; grid-template-columns:160px 1fr 260px; align-items:flex-start; gap:14px; }
+          .pdfPage.compact2{ font-size:9px; }
+          .pdfPage.compact2 table{ font-size:9px; }
+          .pdfPage.compact2 th, .pdfPage.compact2 td{ padding:3px 4px; }
+          .pdfPage.compact2 .h2{ font-size:10px; }
+          .pdfPage.compact2 .muted{ font-size:9px; }
+.pdfTop{ display:grid; grid-template-columns:160px 1fr 260px; align-items:flex-start; gap:14px; }
           .pdfLogo{ flex-shrink:0; } .pdfLogo img{ width:120px; height:auto; display:block; }
           .pdfTitle{ text-align:center; }
           .pdfTitle h1{ margin:0; font-size:18px; }
@@ -2884,18 +2895,60 @@ async function exportProposalPDF(){
       }
 
       const node = printArea.firstElementChild;
+      const fixedPdfWidth = 1200;
+      const oldInlineWidth = node.style.width;
+      const oldInlineMaxWidth = node.style.maxWidth;
 
-      // Captura estável (não depende de resolução do monitor)
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        windowWidth: node.scrollWidth,
-        windowHeight: node.scrollHeight,
-        scrollX: 0,
-        scrollY: 0
-      });
+      // Render adaptativo (evita diferenças entre PCs por métrica de fonte/wrap):
+      // tenta aumentar a largura em px e, se necessário, aplicar modo compacto, mas SEM gerar múltiplas páginas.
+      const attempts = [
+        { w: fixedPdfWidth, cls: '' },
+        { w: 1400, cls: 'compact' },
+        { w: 1600, cls: 'compact2' }
+      ];
+
+      let trimmedCanvas = null;
+
+      const applyAttempt = (a) => {
+        try {
+          node.classList.remove('compact','compact2');
+          if (a.cls) node.classList.add(a.cls);
+          node.style.width = a.w + 'px';
+          node.style.maxWidth = a.w + 'px';
+        } catch(e){}
+      };
+
+      // alvo de aspecto da área útil do A4 landscape com margens 8mm e header 26mm
+      const targetWmm = 297 - 8 - 8;
+      const targetHmm = 210 - (8 + 26) - 8;
+      const targetAR = targetWmm / targetHmm;
+
+      for (let i=0; i<attempts.length; i++){
+        const a = attempts[i];
+        applyAttempt(a);
+        await new Promise(r => requestAnimationFrame(() => r()));
+
+        const canvas = await html2canvas(node, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          windowWidth: a.w,
+          windowHeight: node.scrollHeight,
+          scrollX: 0,
+          scrollY: 0
+        });
+
+        const t = trimCanvas(canvas);
+        trimmedCanvas = t;
+        const ar = (t.width || 1) / (t.height || 1);
+        if (ar >= (targetAR * 0.985)) break;
+      }
+
+      // restaurar estilos
+      node.style.width = oldInlineWidth;
+      node.style.maxWidth = oldInlineMaxWidth;
+      node.classList.remove('compact','compact2');
 
       // Remove bordas brancas extras do render (corrige sensação de desalinhamento)
       function trimCanvas(c){
@@ -2942,34 +2995,36 @@ async function exportProposalPDF(){
         }
       }
 
-      const trimmedCanvas = trimCanvas(canvas);
       const imgData = trimmedCanvas.toDataURL('image/jpeg', 0.92);
 
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4', compress: true });
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
 
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
 
-      // Espaçamentos
-      const marginBottom = 6; // mm
-      const marginLeft = 6; // mm
-      const marginRight = 6; // mm
-      const headerH = 22; // mm (reserva para header desenhado via jsPDF)
+      // Espaçamentos (mm)
+      const marginTop = 8;
+      const marginBottom = 8;
+      const marginLeft = 8;
+      const marginRight = 8;
+      const headerH = 26; // mm (reserva para header desenhado via jsPDF)
+      const contentTop = marginTop + headerH;
 
       const availW = pageW - marginLeft - marginRight;
-      const availH = pageH - headerH - marginBottom;
+      const availH = pageH - contentTop - marginBottom;
 
       // Conteúdo (imagem do html2canvas)
       const ratio = Math.min(availW / trimmedCanvas.width, availH / trimmedCanvas.height);
       const drawW = trimmedCanvas.width * ratio;
       const drawH = trimmedCanvas.height * ratio;
+      // Centraliza horizontalmente dentro da página (mantendo o mesmo scale)
       const x = marginLeft + (availW - drawW) / 2;
-      const y = headerH;
+      const y = contentTop + (availH - drawH) / 2;
 
       // Header desenhado via jsPDF (alinhamento consistente)
-      const headerY = 3;
-      const hdrH = 20; // altura total do header
+      const headerY = marginTop;
+      const hdrH = headerH; // altura total do header
 
       // Limites do conteúdo baseado na área do corpo renderizado
       const bodyLeft = x;
