@@ -129,6 +129,25 @@
     .modalHd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border-bottom:1px solid var(--border)}
     .modalHd h3{font-size:14px;color:var(--text)}
     .modalBd{padding:14px}
+    /* --- Polimento visual: Modal Cadastro de proposta (escopo: #maintModal) --- */
+    #maintModal .modalCard{max-width:980px}
+    #maintModal .modalBd{padding:18px 18px 26px}
+    #maintModal .note{line-height:1.45}
+    #maintModal div.small{margin:16px 0 10px !important;font-weight:800;letter-spacing:.02em}
+    #maintModal small.small{margin:6px 0 0 !important;font-weight:600;letter-spacing:0}
+    #maintModal .formGrid{gap:14px}
+    #maintModal .formGrid.formGrid3{grid-template-columns:repeat(3,minmax(220px,1fr))}
+    @media(max-width:820px){#maintModal .formGrid.formGrid3{grid-template-columns:1fr}}
+    #maintModal label{margin-bottom:8px}
+    #maintModal input,#maintModal select{padding:11px 12px}
+    #maintModal .checkWrap{margin-top:6px;display:grid;gap:14px}
+    #maintModal .checkLine{padding:12px 14px}
+    #maintModal .checkField{display:block}
+    #maintModal .exportToolbar{display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-top:18px;padding-top:6px}
+    #maintModal #btnExportPDF{margin-top:0}
+    
+                #maintModal .checkHint{display:block;margin-top:6px !important;margin-left:0 !important;padding-left:0 !important;line-height:1.35;max-width:100%}
+
     .xBtn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:6px 10px;cursor:pointer}
     .xBtn:hover{border-color:rgba(45,212,255,.6)}
     .formGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -149,8 +168,6 @@
     .equipChoices{ grid-template-columns:repeat(3, minmax(90px,1fr)); }
     .equipImg{ width:260px; height:260px; }
   }
-
-
 
 /* Checkbox row (Selecionar itens antes de exportar) */
 .checkWrap{ grid-column:1 / -1; }
@@ -177,7 +194,6 @@
 .checkLine span{ color: var(--text); font-size:13px; }
 .checkHint{ display:block; margin-top:6px; margin-left:28px; }
 
-
 /* Equip carousel (auto, single) */
 .equipCarouselWrap{
   width:100%;
@@ -200,14 +216,12 @@
 /* Oculta as opções clicáveis (mantém no DOM para reaproveitar os data-src) */
 .equipChoices{ display:none !important; }
 
-
 /* Equip panel title centered */
 .equipPanel > .pn{
   display:block;
   width:100%;
   text-align:center;
 }
-
 
 /* Visual polish pack */
 :root{
@@ -319,8 +333,6 @@ select:focus, input:focus{
 }
 :root[data-theme="light"] .logoPlate img{ filter: drop-shadow(0 6px 14px rgba(17,24,39,.18)); }
 
-
-
 /* Dark: logo mais forte */
 :root:not([data-theme="light"]) .logoPlate{
   position: relative;
@@ -390,7 +402,6 @@ select:focus, input:focus{
   background: rgba(255,255,255,.92);
 }
 
-
 /* Light theme */
 :root[data-theme="light"] .pill{
   background: rgba(255,255,255,.92);
@@ -420,10 +431,8 @@ select:focus, input:focus{
   background: rgba(255,255,255,.96);
 }
 
-
 /* Selection (Peças) */
 .chartItemChk{ width:18px; height:18px; cursor:pointer; accent-color: var(--primary); }
-
 
 /* UI: Atualizar - Online (esconde campos/explicacao; mantem auto-load funcionando) */
 #onlineCard .note{display:none !important;}
@@ -568,7 +577,6 @@ select:focus, input:focus{
             <input id="priceInput" type="file" accept=".xlsx,.xls,.csv,.enc" />
           </div>
 
-          
       <div style="height:12px"></div>
 
       <div class="card" id="onlineCard">
@@ -706,131 +714,138 @@ select:focus, input:focus{
     </div>
   </div>
 
-  <div class="modal" id="maintModal" aria-hidden="true">
-    <div class="modalCard">
-      <div class="modalHd">
-        <h3>Cadastro de proposta</h3>
-        <div class="toolbar">
-          <button class="xBtn" id="btnCloseModal" type="button">Fechar</button>
-        </div>
-      </div>
-      <div class="modalBd">
-        <div class="note" style="margin-bottom:10px">Tela para criar proposta de PMP (Plano de manutenção).</div>
-
-        <div class="small" style="margin:10px 0 6px">Dados do cliente</div>
-        <div class="formGrid">
-          <div>
-            <label>Nome do cliente</label>
-            <input id="pClientName" placeholder="Nome do cliente" />
-          </div>
-          <div>
-            <label>Telefone</label>
-            <input id="pClientPhone" placeholder="(67) 9xxxx-xxxx" inputmode="tel" />
-          </div>
-          <div>
-            <label>E-mail</label>
-            <input id="pClientEmail" type="email" placeholder="cliente@empresa.com" />
-          </div>
-        </div>
-
-        <div style="height:12px"></div>
-
-        <div class="small" style="margin:10px 0 6px">Dados da máquina</div>
-        <div class="formGrid">
-          <div>
-            <label>Modelo (para filtrar os dados)</label>
-            <select id="pModel"></select>
-          </div>
-          <div>
-            <label>Cidade</label>
-            <input id="pCity" placeholder="Dourados" />
-          </div>
-          <div>
-            <label>Horas: Inicial</label>
-            <input id="pHIni" type="number" min="0" step="1" placeholder="0" />
-          </div>
-          <div>
-            <label>Horas: Final</label>
-            <input id="pHFim" type="number" min="0" step="1" placeholder="2000" />
-          </div>
-          <div>
-            <label>Taxa de atendimento (R$)</label>
-            <input id="pFee" type="number" min="0" step="0.01" placeholder="0,00" />
-          </div>
-          <div>
-            <label>Atendimentos (quantas vezes)</label>
-            <input id="pFeeTimes" type="number" min="0" step="1" />
-            <small class="small">Valor adicionado ao total: taxa × vezes.</small>
-          </div>
+  <div aria-hidden="true" class="modal" id="maintModal">
+<div class="modalCard">
+<div class="modalHd">
+<h3>Cadastro de proposta</h3>
+<div class="toolbar">
+<button class="xBtn" id="btnCloseModal" type="button">Fechar</button>
+</div>
+</div>
+<div class="modalBd">
+<div class="note" style="margin-bottom:10px">Tela para criar proposta de PMP (Plano de manutenção).</div>
+<div class="small" style="margin:10px 0 6px">Dados do cliente</div>
+<div class="formGrid">
 <div>
-  <div class="checkWrap">
-  <label class="checkLine" for="pSelectItemsMode">
-    <input id="pSelectItemsMode" type="checkbox">
-    <span>Selecionar itens antes de exportar (PDF)</span>
-  </label>
-  <small class="small checkHint">Abre uma janela com todos os itens para seleção antes de gerar o PDF.</small>
-
-      <label class="checkLine" for="pApplyDiscounts">
-        <input id="pApplyDiscounts" type="checkbox" />
-        <span>Aplicar descontos individuais nas peças</span>
-      </label>
-      <small class="small checkHint">Abre uma janela com todos os itens para informar desconto em % por item antes de gerar o PDF.</small>
-
-        <label class="checkLine" for="pIncludeTimestamp">
-          <input id="pIncludeTimestamp" type="checkbox" checked>
-          <span>Incluir timestamp ("Emitido em...") no PDF</span>
-        </label>
-        <small class="small checkHint">Se desmarcado, o PDF será gerado sem a linha de emissão.</small>
+<label>Nome do cliente</label>
+<input id="pClientName" placeholder="Nome do cliente"/>
 </div>
-
-<label>Troca de óleo hidráulico (tempo padrão)</label>
-  <select id="pHydOpt">
-    <option value="2000" selected>Tempo padrão Troca de óleo Hidráulico 2000 hs</option>
-    <option value="4000">Tempo padrão Troca de óleo Hidráulico 4000 hs</option>
-    <option value="5000">Tempo padrão Troca de óleo Hidráulico 5000 hs</option>
-  </select>
-  <small class="small">Escolha apenas uma opção (evita duplicar o item de óleo hidráulico).</small>
+<div>
+<label>Telefone</label>
+<input id="pClientPhone" inputmode="tel" placeholder="(67) 9xxxx-xxxx"/>
 </div>
-        </div>
-
-        <div style="height:12px"></div>
-
-        <div class="formGrid">
+<div>
+<label>E-mail</label>
+<input id="pClientEmail" placeholder="cliente@empresa.com" type="email"/>
+</div>
+</div>
+<div style="height:12px"></div>
+<div class="small" style="margin:10px 0 6px">Dados da máquina</div>
+<div class="formGrid formGrid3">
+<div>
+<label>Modelo (para filtrar os dados)</label>
+<select id="pModel"></select>
+</div>
+<div>
+<label>Série</label>
+<input id="pSerie" placeholder="Série / Nº de série"/>
+</div>
+<div>
+<label>Cidade</label>
+<input id="pCity" placeholder="Dourados"/>
+</div>
+</div>
+<div style="height:10px"></div>
+<div class="formGrid">
+<div>
+<label>Horas: Inicial</label>
+<input id="pHIni" min="0" placeholder="0" step="1" type="number"/>
+</div>
+<div>
+<label>Horas: Final</label>
+<input id="pHFim" min="0" placeholder="2000" step="1" type="number"/>
+</div>
+<div>
+<label>Taxa de atendimento (R$)</label>
+<input id="pFee" min="0" placeholder="0,00" step="0.01" type="number"/>
+</div>
+<div>
+<label>Atendimentos (quantas vezes)</label>
+<input id="pFeeTimes" min="0" step="1" type="number"/>
+<small class="small">Valor adicionado ao total: taxa × vezes.</small>
+</div>
+<div class="checkWrap">
+<div class="checkField">
+<label class="checkLine" for="pSelectItemsMode">
+<input id="pSelectItemsMode" type="checkbox"/>
+<span>Selecionar itens antes de exportar (PDF)</span>
+</label>
+<small class="small checkHint">Abre uma janela com todos os itens para seleção antes de gerar o PDF.</small>
+</div>
+<div class="checkField">
+<label class="checkLine" for="pApplyDiscounts">
+<input id="pApplyDiscounts" type="checkbox"/>
+<span>Aplicar descontos individuais nas peças</span>
+</label>
+<small class="small checkHint">Abre uma janela com todos os itens para informar desconto em % por item antes de gerar o PDF.</small>
+</div>
+<div class="checkField">
+<label class="checkLine" for="pIncludeTimestamp">
+<input checked="" id="pIncludeTimestamp" type="checkbox"/>
+<span>Incluir timestamp ("Emitido em...") no PDF</span>
+</label>
+<small class="small checkHint">Se desmarcado, o PDF será gerado sem a linha de emissão.</small>
+</div>
+</div>
 <div style="grid-column:1/-1">
-            <label>Condição de pagamento</label>
-            <input id="pPayCond" placeholder="Ex.: 30 dias / 2x / à vista..." />
-          </div>
-        </div>
+<label>Troca de óleo hidráulico (tempo padrão)</label>
+<select id="pHydOpt">
+<option selected="" value="2000">Tempo padrão Troca de óleo Hidráulico 2000 hs</option>
+<option value="4000">Tempo padrão Troca de óleo Hidráulico 4000 hs</option>
+<option value="5000">Tempo padrão Troca de óleo Hidráulico 5000 hs</option>
+</select>
+<small class="small">Escolha apenas uma opção (evita duplicar o item de óleo hidráulico).</small>
+</div>
+<div style="grid-column:1/-1">
+<label>Condição de pagamento</label>
+<input id="pPayCond" placeholder="Ex.: 30 dias / 2x / à vista..."/>
+</div>
+</div>
 
-        <div style="height:10px"></div>
 
-        <div class="toolbar">
-          <button class="btn" id="btnExportPDF" type="button">Exportar PDF</button></div>
+<div class="toolbar exportToolbar">
+<button class="btn" id="btnExportPDF" type="button">Exportar PDF</button></div>
 
-        <div style="height:10px"></div>
-        <div style="height:12px"></div>
-        <div class="note" id="maintMsg" style="display:none"></div>
+<div style="height:10px"></div>
 
-        <div style="height:12px"></div>
-        <div id="maintListWrap" style="display:none">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Cliente</th>
-                <th>Modelo</th>
-                <th>Horas</th>
-                <th>Total</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="maintList"></tbody>
-          </table>
-        </div>
-      </div></div>
-    </div>
-  </div>
+<div style="height:12px"></div>
 
+<div class="note" id="maintMsg" style="display:none"></div>
+
+<div style="height:12px"></div>
+
+<div id="maintListWrap" style="display:none">
+<table class="table">
+<thead>
+<tr>
+<th>Data</th>
+<th>Cliente</th>
+<th>Modelo</th>
+<th>Horas</th>
+<th>Total</th>
+<th>Ações</th>
+</tr>
+</thead>
+<tbody id="maintList"></tbody>
+</table>
+</div></div>
+
+
+
+
+
+
+</div></div>
 
 
 <!-- Modal: Seleção de Itens do PDF -->
@@ -930,13 +945,10 @@ select:focus, input:focus{
     const debugWarn = DEBUG ? console.warn.bind(console) : () => {};
     const debugError = console.error.bind(console); // erros críticos sempre visíveis
 
-
     // Senha em memória (sessão da aba)
     var sessionPass = null;
 
-
     // Senha em memória (sessão da aba)
-
 
     // ===== Auto-load (GitHub Pages): Base.enc + Price.enc =====
     const AUTOURLKEY = 'pmp_autourl_v1';
@@ -1114,7 +1126,6 @@ select:focus, input:focus{
       throw (lastErr || new Error('Falha ao descriptografar.'));
     }
 
-
     async function loadBaseFromUrlAuto(url){
       const u = String(url||'').trim();
       if(!u) throw new Error('URL da BASE vazia.');
@@ -1156,14 +1167,12 @@ select:focus, input:focus{
       render();
     }
 
-
 // Debounce para evitar render pesado a cada tecla
 let __renderTimer = null;
 function scheduleRender(){
   clearTimeout(__renderTimer);
   __renderTimer = setTimeout(render, 180);
 }
-
 
 // =============== Dashboard data ===============
 let allData = [];
@@ -1216,7 +1225,6 @@ function pnToText(v){
   }
   return String(v).trim();
 }
-
 
 function updatePriceCount(){
   const el = document.getElementById('priceCount');
@@ -1334,7 +1342,6 @@ async function loadPriceFile(file){
     setStatus('err', 'Erro preços: ' + (((e && e.message) ? e.message : e)));
   }
 }
-
 
 function setStatus(kind, text){
   const dot = document.getElementById('statusDot');
@@ -1652,8 +1659,6 @@ function render(){
 
 }
 
-
-
 function renderChart(summary, hours){
   const ctxEl = document.getElementById('chartByType');
   if (!ctxEl) return;
@@ -1713,8 +1718,6 @@ function renderChart(summary, hours){
   });
 }
 
-
-
     function getIncludeTimestamp(){
       const el = document.getElementById('pIncludeTimestamp');
       return el ? !!el.checked : true;
@@ -1731,8 +1734,6 @@ function esc(x){
     .replaceAll('"','&quot;')
     .replaceAll("'",'&#039;');
 }
-
-
 
 function fillProposalModels(){
   const pm = document.getElementById('pModel');
@@ -1886,6 +1887,7 @@ function saveMaint(){
   const clientEmail = document.getElementById('pClientEmail').value.trim();
 
   const model = document.getElementById('pModel').value.trim();
+  const serie = (document.getElementById('pSerie')?.value || '').trim();
   const city = document.getElementById('pCity').value.trim();
   const hIni = Number(document.getElementById('pHIni').value || 0);
   const hFim = Number(document.getElementById('pHFim').value || 0);
@@ -2111,7 +2113,6 @@ function clearMaint(){
   }
 // Wire events ===============
 
-
   // Wire events - Discount modal
   const dModal = document.getElementById('discountModal');
   if(dModal){
@@ -2196,7 +2197,6 @@ if (priceDropZone && priceInput){
 document.getElementById('modelSelect').addEventListener('change', render);
 document.getElementById('hoursSelect').addEventListener('change', render);
 document.getElementById('searchInput').addEventListener('input', scheduleRender);
-
 
 document.getElementById('btnClear').addEventListener('click', () => {
   allData = [];
@@ -2314,8 +2314,6 @@ updateMaintCount();
     return String(v ?? '').trim();
   }
 
-  
-
   // Telefone (MS): formata somente ao sair do campo (não interfere durante a digitação)
   function formatPhoneMS(raw){
   const digitsAll = String(raw ?? '').replace(/\D/g, '');
@@ -2349,7 +2347,6 @@ updateMaintCount();
   // 9 dígitos: 1 + 4 + 4
   return out + d.slice(0, 1) + d.slice(1, 5) + '-' + d.slice(5, 9);
 }
-
 
   function bindPhoneMask(){
     const el = document.getElementById('pClientPhone');
@@ -2402,7 +2399,6 @@ function buildProposalItems(model, hIni, hFim) {
           if (hydOpt === '4000' && !descNorm.includes('4000')) continue;
           if (hydOpt === '5000' && !descNorm.includes('5000')) continue;
         }
-        
 
           // 2) PN/interval filter for hydraulic oil
         // - Tempo padrão: filtra pelo intervalo selecionado (feito acima) e PN não é relevante
@@ -2455,6 +2451,7 @@ function buildPrintHTML(){
     const clientEmail = getVal('pClientEmail');
 
     const model = getVal('pModel');
+    const serie = getVal('pSerie');
     const city = getVal('pCity');
 
     const hIni = Number(document.getElementById('pHIni')?.value || 0);
@@ -2491,8 +2488,6 @@ function buildPrintHTML(){
       return { ...it, desc, qtyTotal: qty, total: unit * qty };
     });
 
-    
-
     // Descontos individuais (somente peças)
     const applyDisc = !!document.getElementById('pApplyDiscounts')?.checked;
     const itemsForPdf = applyDisc ? itemsFinal.map(applyDiscountToItem) : itemsFinal;
@@ -2518,16 +2513,20 @@ const hourCount = (hourNs || []).length;
 
     const rows = itemsForPdf.length ? itemsForPdf.map(it => {
       const cols = (hourNs || []).map(h => {
-        const v = Number(it.hours?.[h] || 0);
-        return `<td style="text-align:right;">${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>`;
+        const v = Number(it.hours?.[h] ?? 0);
+        const vTxt = (Number.isFinite(v) && Math.abs(v) > 0) ? Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '';
+        return `<td style="text-align:right;">${vTxt}</td>`;
       }).join('');
+
+      const q = Number(it.qtyTotal ?? 0);
+      const qTxt = (Number.isFinite(q) && Math.abs(q) > 0) ? Number(q).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '';
 
       return `
       <tr>
         <td>${esc(it.desc)}</td>
         <td style="white-space:nowrap;">${esc(it.pn || '-')}</td>
         ${cols}
-        <td style="text-align:right;">${Number(it.qtyTotal||0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
+        <td style="text-align:right;">${qTxt}</td>
         <td style="text-align:right;">${fmtBRL2(it.unit||0)}</td>
         <td style="text-align:right;">${fmtBRL2(it.total||0)}</td>
       </tr>`;
@@ -2558,7 +2557,6 @@ const hourCount = (hourNs || []).length;
           .pdfLogoSpace{ width:140px; height:40px; }
           .pdfClient{ max-height:52px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
           .pdfClient .muted{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
 
           .muted{ color:#555; font-size:11px; }
           .box{ border:1px solid #d7dde5; border-radius:8px; padding:10px; }
@@ -2653,6 +2651,7 @@ const hourCount = (hourNs || []).length;
           <div class="box">
             <div class="h2">Equipamento</div>
             <div><b>Modelo:</b> ${esc(model)}</div>
+            <div><b>Série:</b> ${esc(serie || "-")}</div>
             <div><b>Horas:</b> ${esc(hIni)} → ${esc(hFim)}</div>
             <div><b>Custo hora:</b> ${fmtBRL2(costHour)}</div>
           </div>
@@ -2711,7 +2710,6 @@ const hourCount = (hourNs || []).length;
     return { html, clientName };
   }
 
-  
   // Opção 3: Converter imagem externa para base64 (para entrar no html2canvas)
   async function convertImageToBase64(imgUrl) {
     const response = await fetch(imgUrl, { mode: 'cors' });
@@ -2725,17 +2723,12 @@ const hourCount = (hourNs || []).length;
     });
   }
 
-
   const NORS_LOGO_B64 = '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'; const NORS_LOGO_MIME = 'image/jpeg';
-
-  
-
 
 // Chave estável do item (PN|Descrição) usada na seleção/edição do PDF
 function selItemKey(it){
   return String(it?.pn || '') + '|' + String(it?.desc || '');
 }
-
 
 function openSelectItemsModal(built){
   // Sempre inicia estruturas usadas na seleção/edição
@@ -3099,8 +3092,6 @@ async function exportProposalPDF(){
     });
   }
 
-  
-
 // Equipamento: troca automática das imagens a cada 5s (sem seleção manual)
 function initEquipCarousel(){
   const cards = Array.from(document.querySelectorAll('#equipChoices .equipCard'));
@@ -3136,14 +3127,12 @@ function initEquipSelection(){
   initEquipCarousel();
 }
 
-
   // Inicia após o DOM estar pronto
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initEquipSelection);
   } else {
     initEquipSelection();
   }
-
 
   // Theme toggle (dark <-> light)
   (function initThemeToggle(){
@@ -3174,13 +3163,11 @@ function initEquipSelection(){
     if (t && t.id === 'btnExportPDF') handleExportPDFClick();
   });
 
-
     // ===== Eventos: Auto-load GitHub Pages =====
     (function initAutoLoad(){
       const cfg = getAutoCfg();
       const baseEl = document.getElementById('baseUrlAuto');
       const priceEl = document.getElementById('priceUrlAuto');
-
 
       // Defaults (GitHub Pages): use .enc
       try{
