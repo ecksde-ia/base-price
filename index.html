@@ -2006,7 +2006,7 @@ function clearMaint(){
 
       return `
         <tr data-key="${esc(key)}">
-          <td>${esc(it.desc)}</td>
+          <td>${esc(isLaborItem(it) ? 'Mão de obra' : it.desc)}</td>
           <td style="white-space:nowrap"><span class="pn">${esc(it.pn)}</span></td>
           <td style="text-align:right">${Number(qty||0).toLocaleString('pt-BR',{maximumFractionDigits:2})}</td>
           <td style="text-align:right">${fmtBRL2(unitOrig)}</td>
@@ -2493,9 +2493,13 @@ function buildPrintHTML(){
     const itemsForPdf = applyDisc ? itemsFinal.map(applyDiscountToItem) : itemsFinal;
 const hourCount = (hourNs || []).length;
     const pdfScaleClass = hourCount > 6 ? 'compact' : '';
+    const normDesc = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const isLaborItem = (it) => normDesc(it?.desc).includes('tempo padrao');
+
     const feeTotal = (fee || 0) * (feeTimes || 0);
-    const partsTotal = itemsForPdf.reduce((a,it) => a + (it.total || 0), 0);
-    const total = partsTotal + feeTotal;
+    const laborTotal = itemsForPdf.filter(isLaborItem).reduce((a,it) => a + (it.total || 0), 0);
+    const partsTotal = itemsForPdf.filter(it => !isLaborItem(it)).reduce((a,it) => a + (it.total || 0), 0);
+    const total = partsTotal + laborTotal + feeTotal;
     const periodo = Math.max(0, Math.abs((hFim || 0) - (hIni || 0)));
     const costHour = periodo > 0 ? (total / periodo) : 0;
 
@@ -2524,7 +2528,7 @@ const hourCount = (hourNs || []).length;
       return `
       <tr>
         <td>${esc(it.desc)}</td>
-        <td style="white-space:nowrap;">${esc(it.pn || '-')}</td>
+        <td style="white-space:nowrap;">${esc(isLaborItem(it) ? '-' : (it.pn || '-'))}</td>
         ${cols}
         <td style="text-align:right;">${qTxt}</td>
         <td style="text-align:right;">${fmtBRL2(it.unit||0)}</td>
@@ -2696,6 +2700,7 @@ const hourCount = (hourNs || []).length;
           <div class="box">
             <div class="h2">Totais</div>
             <div class="sumrow"><span>Subtotal peças</span><span>${fmtBRL2(partsTotal)}</span></div>
+            <div class="sumrow"><span>Mão de obra</span><span>${fmtBRL2(laborTotal)}</span></div>
             <div class="sumrow"><span>Atendimento (${feeTimes}×)</span><span>${fmtBRL2(feeTotal)}</span></div>
             <div class="sumrow"><b>Total</b><b>${fmtBRL2(total)}</b></div>
             <div class="sumrow muted"><span>Custo hora</span><span>${fmtBRL2(costHour)}</span></div>
@@ -2899,8 +2904,8 @@ async function exportProposalPDF(){
       const oldInlineWidth = node.style.width;
       const oldInlineMaxWidth = node.style.maxWidth;
 
-      // Render adaptativo (evita diferenças entre PCs por métrica de fonte/wrap):
-      // tenta aumentar a largura em px e, se necessário, aplicar modo compacto, mas SEM gerar múltiplas páginas.
+      // Render adaptativo (evita diferenças entre PCs por métrica de fonte/wrap).
+      // Tenta aumentar a largura em px e, se necessário, aplicar modo compacto, mas SEM gerar múltiplas páginas.
       const attempts = [
         { w: fixedPdfWidth, cls: '' },
         { w: 1400, cls: 'compact' },
