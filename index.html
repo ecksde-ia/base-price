@@ -779,11 +779,11 @@ select:focus, input:focus{
 <div class="checkField">
 <label class="checkLine" for="pSelectItemsMode">
 <input id="pSelectItemsMode" type="checkbox"/>
-<span>Selecionar itens antes de exportar (PDF)</span>
+<span>Editar itens antes de exportar (PDF)</span>
 </label>
 <small class="small checkHint">Abre uma janela com todos os itens para seleção antes de gerar o PDF.</small>
 </div>
-<div class="checkField">
+<div class="checkField" style="display:none">
 <label class="checkLine" for="pApplyDiscounts">
 <input id="pApplyDiscounts" type="checkbox"/>
 <span>Aplicar descontos individuais nas peças</span>
@@ -902,6 +902,16 @@ select:focus, input:focus{
     </div>
     <div class="modalBd">
       <div class="note" style="margin-bottom:10px;">Desmarque os itens que não devem entrar no PDF. O total do PDF será recalculado com base na seleção.</div>
+      <div style="margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:rgba(45,212,255,.05)">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span class="small" style="color:var(--muted)">Aplicar desconto geral</span>
+          <input id="selGlobalDiscountInput" type="number" min="0" max="100" step="0.01" placeholder="0" class="discountInput" style="text-align:center;width:86px">
+          <span class="small" style="color:var(--muted)">%</span>
+          <button class="btn btnPrimary" type="button" id="btnSelApplyGlobalDiscount" style="margin-left:auto">Aplicar em todos</button>
+          <button class="btn btn-ghost" type="button" id="btnSelDiscountReset">Zerar</button>
+        </div>
+      </div>
+
       <div style="max-height:52vh; overflow:auto; border:1px solid var(--border); border-radius:12px;">
         <table class="table">
           <thead>
@@ -910,8 +920,10 @@ select:focus, input:focus{
               <th>Descrição</th>
               <th style="width:140px;">Part number</th>
               <th style="width:90px; text-align:right;">Qtd</th>
-              <th style="width:110px; text-align:right;">Preço un</th>
-              <th style="width:120px; text-align:right;">Total</th>
+              <th style="width:120px; text-align:right;">Unit. orig.</th>
+              <th style="width:90px; text-align:right;">Desc. %</th>
+              <th style="width:120px; text-align:right;">Unit. final</th>
+              <th style="width:130px; text-align:right;">Total</th>
             </tr>
           </thead>
           <tbody id="selItemsBody">
@@ -939,6 +951,15 @@ select:focus, input:focus{
       </div>
       <div class="modalBd">
         <div class="note" style="margin-bottom:10px">Defina o desconto (%) por item. O preço unitário e o total serão arredondados para 2 casas decimais.</div>
+    <div style="margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:rgba(45,212,255,.05)">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="small" style="color:var(--muted)">Aplicar desconto geral</span>
+        <input id="selGlobalDiscountInput" type="number" min="0" max="100" step="0.01" placeholder="0" class="discountInput" style="text-align:center;width:86px">
+        <span class="small" style="color:var(--muted)">%</span>
+        <button class="btn btnPrimary" type="button" id="btnSelApplyGlobalDiscount" style="margin-left:auto">Aplicar em todos</button>
+        <button class="btn btn-ghost" type="button" id="btnSelDiscountReset">Zerar</button>
+      </div>
+    </div>
 
         <div style="margin-bottom:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:rgba(45,212,255,.05)">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1911,8 +1932,7 @@ function openMaintModal(){
   document.getElementById('maintListWrap').style.display = 'none';
   updateMaintCount();
   fillProposalModels();
-    bindPhoneMask();
-  
+    if (typeof bindPhoneMask === 'function') bindPhoneMask();
 }
 
 function closeMaintModal(){
@@ -2147,7 +2167,7 @@ function clearMaint(){
       const qty = (ed.qty === 0 || ed.qty) ? Number(ed.qty) : Number(it.qtyTotal || 0);
       const desc = (ed.desc === '' || ed.desc) ? String(ed.desc) : String(it.desc || '');
       const unit = Number(it.unit || 0);
-      return { ...it, desc, qtyTotal: qty, total: unit * qty };
+      return { ...it, __key, desc, qtyTotal: qty, total: unit * qty };
     });
 
     return itemsFinal;
@@ -2185,6 +2205,17 @@ if (sbEl){
     renderChart(lastSummaryForChart, lastHoursForChart);
   });
 }
+
+
+  // Identifica itens de mão de obra (tempo padrão)
+  function isLaborItem(it){
+    try{
+      const s = String(it && it.desc || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      return s.includes('tempo padrao');
+    }catch(e){
+      return false;
+    }
+  }
 
 const fileInput = document.getElementById('fileInput');
 const dropZone = document.getElementById('dropZone');
@@ -2515,22 +2546,23 @@ function buildPrintHTML(){
 
     // Seleção de itens (apenas para o PDF)
     const _sel = (pdfSelKeys && pdfSelKeys.size) ? pdfSelKeys : null;
-    const itemsEff = _sel ? items.filter(it => _sel.has(String(it.pn||'') + '|' + String(it.desc||''))) : items;
+    const itemsEff = _sel ? items.filter(it => _sel.has(selItemKey(it))) : items;
 
     // Aplicar edições (descrição/qtd) somente no PDF
     const _ed = (pdfSelEdits && pdfSelEdits.size) ? pdfSelEdits : null;
     const itemsFinal = itemsEff.map(it => {
       const k = String(it?.pn || '') + '|' + String(it?.desc || '');
+      const __key = k;
       const ed = _ed ? _ed.get(k) : null;
-      if (!ed) return it;
+      if (!ed) return { ...it, __key };
       const qty = (ed.qty === 0 || ed.qty) ? Number(ed.qty) : Number(it.qtyTotal || 0);
       const desc = (ed.desc === '' || ed.desc) ? String(ed.desc) : String(it.desc || '');
       const unit = Number(it.unit || 0);
-      return { ...it, desc, qtyTotal: qty, total: unit * qty };
+      return { ...it, __key, desc, qtyTotal: qty, total: unit * qty };
     });
 
     // Descontos individuais (somente peças)
-    const applyDisc = !!document.getElementById('pApplyDiscounts')?.checked;
+    const applyDisc = !!document.getElementById('pSelectItemsMode')?.checked;
     const itemsForPdf = applyDisc ? itemsFinal.map(applyDiscountToItem) : itemsFinal;
 const hourCount = (hourNs || []).length;
     const pdfScaleClass = hourCount > 6 ? 'compact' : '';
@@ -2783,6 +2815,7 @@ const hourCount = (hourNs || []).length;
 
 // Chave estável do item (PN|Descrição) usada na seleção/edição do PDF
 function selItemKey(it){
+  if(it && (it.__key === '' || it.__key)) return String(it.__key);
   return String(it?.pn || '') + '|' + String(it?.desc || '');
 }
 
@@ -2792,6 +2825,7 @@ function openSelectItemsModal(built){
   pdfSelEdits = edits;
   pdfSelBuilt = built;
   pdfSelKeys = new Set();
+  pdfDiscounts = new Map();
 
   const body = document.getElementById('selItemsBody');
   if (!body){ showMsg('Tabela de seleção não encontrada.'); return; }
@@ -2800,7 +2834,7 @@ function openSelectItemsModal(built){
   const items = (built && built.items) ? built.items : [];
 
   if (!items.length){
-    body.innerHTML = '<tr><td colspan="7" class="note">Nenhum item no intervalo.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="note">Nenhum item no intervalo.</td></tr>';
   } else {
     // Marcar tudo por padrão e carregar valores editáveis iniciais
     for (const it of items){
@@ -2828,12 +2862,97 @@ function openSelectItemsModal(built){
           <td style="text-align:right;">
             <input class="selQty" data-key="${esc(key)}" type="number" min="0" step="0.01" value="${qtyVal}" style="width:84px; padding:7px 8px; border-radius:10px; border:1px solid var(--border); background:rgba(15,22,48,.9); color:var(--text); text-align:right;" />
           </td>
-          <td style="text-align:right;"><span class="selUnit" data-unit="${unitVal}">${fmtBRL2(unitVal)}</span></td>
+          <td style="text-align:right;"><span class="selUnit" data-key="${esc(key)}" data-unit="${unitVal}">${fmtBRL2(unitVal)}</span></td>
+          <td style="text-align:right;">
+            <input class="selDisc" data-key="${esc(key)}" type="number" min="0" max="100" step="0.01" value="0" style="width:72px; padding:7px 8px; border-radius:10px; border:1px solid var(--border); background:rgba(15,22,48,.9); color:var(--text); text-align:right;" />
+          </td>
+          <td style="text-align:right;"><span class="selUnitFinal" data-key="${esc(key)}">${fmtBRL2(unitVal)}</span></td>
           <td style="text-align:right;"><span class="selTot" data-key="${esc(key)}">${fmtBRL2(totVal)}</span></td>
         </tr>`;
     }).join('');
 
-    body.querySelectorAll('.selItemChk').forEach(chk => {
+    
+
+    // Atualiza linha conforme qtd e desconto
+    function updateSelLine(key){
+      const tr = body.querySelector(`tr input.selItemChk[data-key="${CSS.escape(key)}"]`)?.closest('tr');
+      if(!tr) return;
+
+      const unitEl = tr.querySelector('.selUnit');
+      const discEl = tr.querySelector('.selDisc');
+      const unitFinalEl = tr.querySelector('.selUnitFinal');
+      const totEl = tr.querySelector('.selTot');
+
+      const unit = unitEl ? (Number(unitEl.getAttribute('data-unit')) || 0) : 0;
+      const pct = clampPct(discEl ? discEl.value : (pdfDiscounts.get(key) ?? 0));
+      const unitC = toCents(unit || 0);
+      const discUnitC = pct>0 ? Math.round(unitC * (100 - pct) / 100) : unitC;
+      const unitFinal = fromCents(discUnitC);
+
+      const ed = edits.get(key) || { desc: '', qty: 0 };
+      const qty = Number(ed.qty || 0);
+      const tot = unitFinal * (Number.isFinite(qty) ? qty : 0);
+
+      if(unitFinalEl) unitFinalEl.textContent = fmtBRL2(unitFinal);
+      if(totEl) totEl.textContent = fmtBRL2(tot);
+
+      // opcional: riscado quando houver desconto
+      if(unitEl){
+        if(pct>0){
+          unitEl.innerHTML = `<span class="priceStrike">${fmtBRL2(unit)}</span><span class="priceFinal">${fmtBRL2(unitFinal)}</span>`;
+        }else{
+          unitEl.textContent = fmtBRL2(unit);
+        }
+      }
+    }
+
+    // Preenche descontos existentes (neste fluxo inicial é 0, mas deixa pronto)
+    body.querySelectorAll('.selDisc').forEach(inp => {
+      const k = inp.getAttribute('data-key');
+      const v = clampPct(pdfDiscounts.get(k) ?? 0);
+      inp.value = String(v);
+    });
+
+    // Wire desconto por item
+    body.querySelectorAll('.selDisc').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const k = inp.getAttribute('data-key');
+        const v = clampPct(inp.value);
+        if(k) pdfDiscounts.set(k, v);
+        if(k) updateSelLine(k);
+      });
+    });
+
+    // Wire desconto geral
+    document.getElementById('btnSelApplyGlobalDiscount')?.addEventListener('click', () => {
+      const v = clampPct(document.getElementById('selGlobalDiscountInput')?.value);
+      body.querySelectorAll('.selDisc').forEach(inp => {
+        const k = inp.getAttribute('data-key');
+        inp.value = String(v);
+        if(k) pdfDiscounts.set(k, v);
+        if(k) updateSelLine(k);
+      });
+      const gi = document.getElementById('selGlobalDiscountInput');
+      if(gi) gi.value = '';
+    });
+
+    document.getElementById('btnSelDiscountReset')?.addEventListener('click', () => {
+      pdfDiscounts = new Map();
+      body.querySelectorAll('.selDisc').forEach(inp => {
+        const k = inp.getAttribute('data-key');
+        inp.value = '0';
+        if(k) pdfDiscounts.set(k, 0);
+        if(k) updateSelLine(k);
+      });
+    });
+
+    // inicializa totais
+    for(const it of items){
+      const k = selItemKey(it);
+      updateSelLine(k);
+    }
+
+body.querySelectorAll('.selItemChk').forEach(chk => {
       chk.addEventListener('change', () => {
         const k = chk.getAttribute('data-key');
         if (chk.checked) pdfSelKeys.add(k);
@@ -2861,12 +2980,8 @@ function openSelectItemsModal(built){
         cur.qty = q;
         edits.set(k, cur);
 
-        // Atualiza total visual
-        const tr = inp.closest('tr');
-        const unitEl = tr ? tr.querySelector('.selUnit') : null;
-        const totEl = tr ? tr.querySelector('.selTot') : null;
-        const unit = unitEl ? (Number(unitEl.getAttribute('data-unit')) || 0) : 0;
-        if (totEl) totEl.textContent = fmtBRL2(unit * q);
+        // Atualiza total visual (com desconto)
+        if(k) updateSelLine(k);
 
         if (chkAll) chkAll.checked = true;
       });
@@ -2885,30 +3000,23 @@ function closeSelectItemsModal(){
 }
 
 function handleExportPDFClick(){
-      const selectMode = !!document.getElementById('pSelectItemsMode')?.checked;
-      const discountMode = !!document.getElementById('pApplyDiscounts')?.checked;
+      const editMode = !!document.getElementById('pSelectItemsMode')?.checked;
 
       const model = String(document.getElementById('pModel')?.value||'').trim();
       if(!model){ showMsg('Selecione o modelo antes de exportar.'); return; }
       if(!allData || !allData.length){ showMsg('Carregue a base de peças antes de exportar.'); return; }
       if(!priceMap || !priceMap.size){ showMsg('Carregue a tabela de preços antes de exportar.'); return; }
 
-      if(!selectMode){
-        // export direto
+      if(!editMode){
         pdfSelKeys = null;
         pdfSelBuilt = null;
         pdfSelEdits = null;
-
-        if(discountMode){
-          const items = getItemsForDiscountFlow();
-          openDiscountModal(items);
-          return;
-        }
-
+        pdfDiscounts = new Map();
         exportProposalPDF();
         return;
       }
 
+      // modo edição (seleção + edições + descontos em um único modal)
       // modo seleção
       const hIni = Number(document.getElementById('pHIni')?.value||0);
       const hFim = Number(document.getElementById('pHFim')?.value||0);
