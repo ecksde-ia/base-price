@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard Manutenção - v1</title>
+  <title>Dashboard Manutenção - v1.1</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🔧</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -119,6 +119,29 @@
     .table tbody tr:hover{background:rgba(45,212,255,.05)}
 
     .pn{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:rgba(45,212,255,.10);border:1px solid rgba(45,212,255,.22);padding:2px 6px;border-radius:8px}
+
+/* Part number copiável (TAB navega linha a linha) */
+.pnCopy{
+  font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  background: rgba(45,212,255,.10);
+  border: 1px solid rgba(45,212,255,.22);
+  padding: 2px 6px;
+  border-radius: 8px;
+  color: var(--text);
+  width: 100%;
+  max-width: 220px;
+  outline: none;
+  cursor: text;
+}
+.pnCopy:focus{
+  border-color: rgba(45,212,255,.85);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+:root[data-theme="light"] .pnCopy{
+  background: rgba(17,24,39,.04);
+  border-color: rgba(17,24,39,.18);
+}
+
     .note{color:var(--muted);font-size:12px;line-height:1.35}
     .chartWrap{height:340px}
 
@@ -1690,7 +1713,7 @@ function render(){
         '<tr>'+
           '<td>' + esc(r['Modelo']) + '</td>'+
           '<td>' + esc(r['Descrição']) + '</td>'+
-          '<td><span class="pn">' + esc(pn) + '</span></td>'+
+          '<td><input class=\"pnCopy\" type=\"text\" value=\"' + esc(pn) + '\" readonly tabindex=\"0\" aria-label=\"Part number\"></td>'+
           '<td>' + esc(hours) + '</td>'+
           '<td>' + qty.toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</td>'+
           '<td>' + (unit ? fmtBRL(unit) : '—') + '</td>'+
@@ -2272,6 +2295,21 @@ if (priceDropZone && priceInput){
 
 document.getElementById('modelSelect').addEventListener('change', render);
 document.getElementById('hoursSelect').addEventListener('change', render);
+
+
+// Part number (Lista de itens): focável, seleciona tudo ao focar (TAB navega para o próximo)
+document.addEventListener('focusin', (e) => {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('pnCopy')) return;
+  try {
+    setTimeout(() => { try { el.select(); } catch (_) {} }, 0);
+  } catch (_) {}
+});
+document.addEventListener('click', (e) => {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('pnCopy')) return;
+  try { el.select(); } catch (_) {}
+});
 document.getElementById('searchInput').addEventListener('input', scheduleRender);
 
 document.getElementById('btnClear').addEventListener('click', () => {
