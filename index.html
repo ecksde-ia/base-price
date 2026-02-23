@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard Manutenção - v1.1</title>
+  <title>Dashboard Manutenção - v1.2</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🔧</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -819,6 +819,13 @@ select:focus, input:focus{
 <span>Incluir timestamp ("Emitido em...") no PDF</span>
 </label>
 <small class="small checkHint">Se desmarcado, o PDF será gerado sem a linha de emissão.</small>
+</div>
+<div class="checkField">
+<label class="checkLine" for="pExportXlsWithPdf">
+<input id="pExportXlsWithPdf" type="checkbox"/>
+<span>Ao exportar PDF, também gerar XLS (Quantidade/Referencia/Preço)</span>
+</label>
+<small class="small checkHint">Gera um .xls com os mesmos itens e preços finais do PDF (considera seleção, edição e descontos).</small>
 </div>
 </div>
 <div style="grid-column:1/-1">
@@ -2603,6 +2610,16 @@ function buildPrintHTML(){
     // Descontos individuais (somente peças)
     const applyDisc = !!document.getElementById('pSelectItemsMode')?.checked;
     const itemsForPdf = applyDisc ? itemsFinal.map(applyDiscountToItem) : itemsFinal;
+
+  // Linhas para exportação XLS (mesmos itens/preços finais do PDF)
+  const xlsRows = [['Quantidade','Referencia','Preço']];
+  for (const it of (itemsForPdf || [])) {
+    const q = Number(it?.qtyTotal ?? it?.qty ?? 0) || 0;
+    const ref = String(it?.pn ?? '-').trim() || '-';
+    const pr = Number(it?.unit ?? 0) || 0;
+    xlsRows.push([q, ref, pr]);
+  }
+
 const hourCount = (hourNs || []).length;
     const pdfScaleClass = hourCount > 6 ? 'compact' : '';
     const normDesc = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -2856,7 +2873,7 @@ const hourCount = (hourNs || []).length;
       </div>
     `;
 
-    return { html, clientName };
+    return { html, clientName, model, hIni, hFim, xlsRows };
   }
 
   // Opção 3: Converter imagem externa para base64 (para entrar no html2canvas)
@@ -3092,6 +3109,34 @@ function handleExportPDFClick(){
       const built = buildProposalItems(model, hIni, hFim);
       openSelectItemsModal(built);
     }
+
+
+function exportProposalXlsFromBuilt(built){
+  try{
+    if (!built || !built.xlsRows || !built.xlsRows.length) return;
+
+    // Ordena A-Z pela coluna B (Referencia)
+    const rowsSorted = (function(){
+      const header = built.xlsRows[0];
+      const body = built.xlsRows.slice(1).slice();
+      body.sort((a,b) => String(a?.[1] ?? '').localeCompare(String(b?.[1] ?? ''), 'pt-BR', { sensitivity: 'base' }));
+      return [header, ...body];
+    })();
+
+    const ws = XLSX.utils.aoa_to_sheet(rowsSorted);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Proposta');
+    const client = String(built.clientName || 'Cliente');
+    const model = String(built.model || '').trim();
+    const hIni = (built.hIni === undefined || built.hIni === null) ? '' : String(built.hIni);
+    const hFim = (built.hFim === undefined || built.hFim === null) ? '' : String(built.hFim);
+    const nm = ['Proposta', safeFileName(client), safeFileName(model), hIni && hFim ? ('h' + hIni + '-' + hFim) : ''].filter(Boolean).join(' - ');
+    XLSX.writeFile(wb, nm + '.xls', { bookType: 'xls' });
+  }catch(e){
+    console.error(e);
+    showMsg('Falha ao gerar XLS da proposta. Veja o console do navegador.');
+  }
+}
 async function exportProposalPDF(){
     try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(e){}
     await new Promise(r => setTimeout(r, 0));
@@ -3341,6 +3386,12 @@ async function exportProposalPDF(){
       // Salvar PDF
       const client = document.getElementById('pClientName')?.value || 'Cliente';
       pdf.save('Proposta - ' + safeFileName(client) + '.pdf');
+
+    // Se marcado no modal, exporta também o XLS com os preços finais do PDF
+    try{
+      const doXls = !!document.getElementById('pExportXlsWithPdf')?.checked;
+      if (doXls) exportProposalXlsFromBuilt(built);
+    }catch(_){}
 
     } catch(e){
       console.error(e);
@@ -3639,9 +3690,9 @@ async function generateFenixFile(){
 
   if(!agg.size){ alert('Nenhum item com quantidade no intervalo selecionado'); return; }
 
-  const rows = [['Quantidade', 'Part Number']];
+  const rows = [['Quantidade', 'Referencia']];
   // ordena por Part Number
-  const entries = [...agg.entries()].sort((a,b) => String(a[0]).localeCompare(String(b[0])));
+  const entries = [...agg.entries()].sort((a,b) => String(a[0]).localeCompare(String(b[0]), 'pt-BR', { sensitivity: 'base' }));
   for(const [pn, qty] of entries){
     rows.push([qty, pn]);
   }
@@ -3651,8 +3702,8 @@ async function generateFenixFile(){
   XLSX.utils.book_append_sheet(wb, ws, 'Fenix');
 
   const safeModel = model.replace(/[^a-z0-9\-_ ]/gi,'_').trim().replace(/\s+/g,'_');
-  const fileName = `Fenix_${safeModel}_${hStart}h-${hEnd}h.xlsx`;
-  XLSX.writeFile(wb, fileName);
+  const fileName = `Fenix_${safeModel}_${hStart}h-${hEnd}h.xls`;
+  XLSX.writeFile(wb, fileName, { bookType: 'xls' });
 
   closeFenixModal();
 }
