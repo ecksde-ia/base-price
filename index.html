@@ -827,6 +827,14 @@ select:focus, input:focus{
 </label>
 <small class="small checkHint">Gera um .xls com os mesmos itens e preços finais do PDF (considera seleção, edição e descontos).</small>
 </div>
+
+        <div class="checkField">
+          <label class="checkLine" for="pGenerateSummary">
+            <input id="pGenerateSummary" type="checkbox" />
+            <span>Gerar PDF extra com "Página de Resumo"</span>
+          </label>
+          <small class="small checkHint">Se marcado, além do PDF principal, será gerado um segundo PDF contendo apenas a página de resumo (Acordo x Tabela).</small>
+        </div>
 </div>
 <div style="grid-column:1/-1">
 <label>Troca de óleo hidráulico (tempo padrão)</label>
@@ -2563,7 +2571,521 @@ function buildProposalItems(model, hIni, hFim) {
     return { items, hourNs };
   }
 
-function buildPrintHTML(){
+
+  function calcPartsLaborFee(items) {
+    const feeVal = Number(document.getElementById('pFee')?.value || 0);
+    const feeTimes = Number(document.getElementById('pFeeTimes')?.value || 0);
+    const feeTotal = (feeVal > 0) ? (feeVal * (feeTimes || 0)) : 0;
+
+    const laborTotal = items.filter(isLaborItem).reduce((a,it) => a + (it.total || 0), 0);
+    const partsTotal = items.filter(it => !isLaborItem(it)).reduce((a,it) => a + (it.total || 0), 0);
+
+    const partsSubtotalNoDisc = items.filter(it => !isLaborItem(it)).reduce((a,it) => {
+      const q = Number(it.qtyTotal ?? it.qty ?? 0) || 0;
+      const uo = Number((it.unitOrig ?? it.unit) || 0) || 0;
+      return a + (uo * q);
+    }, 0);
+
+    const discountCents = items.reduce((acc,it) => {
+      const pct = Number(it.discountPct || 0);
+      if (!(pct > 0)) return acc;
+      const qty = Number(it.qtyTotal ?? it.qty ?? 0) || 0;
+      const uo = Number((it.unitOrig ?? it.unit) || 0) || 0;
+      const uf = Number(it.unit || 0) || 0;
+      const lineDiscC = Math.round((toCents(uo) - toCents(uf)) * qty);
+      return acc + lineDiscC;
+    }, 0);
+
+    const discountTotal = fromCents(discountCents);
+    const partsNetSummary = fromCents(Math.round(toCents(partsSubtotalNoDisc) - discountCents));
+
+    return {partsSubtotalNoDisc, partsNetSummary, partsTotal, discountCents, discountTotal, laborTotal, feeTotal};
+  }
+
+
+  
+  function buildSummaryPDF() {
+    const clientName = String(document.getElementById('pClientName')?.value || '').trim();
+    const clientPhone = String(document.getElementById('pClientPhone')?.value || '').trim();
+    const clientEmail = String(document.getElementById('pClientEmail')?.value || '').trim();
+    const model = String(document.getElementById('pModel')?.value || '').trim();
+    const serie = String(document.getElementById('pSerie')?.value || '').trim();
+    const city = String(document.getElementById('pCity')?.value || '').trim();
+    const hIni = Number(document.getElementById('pHIni')?.value || 0);
+    const hFim = Number(document.getElementById('pHFim')?.value || 0);
+    const fee = Number(document.getElementById('pFee')?.value || 0);
+    const feeTimes = Number(document.getElementById('pFeeTimes')?.value || 0);
+    const payCond = String(document.getElementById('pPayCond')?.value || '').trim();
+
+    // Itens base (mesma origem do PDF principal)
+    const builtItems = buildProposalItems(model, hIni, hFim);
+    const items = builtItems?.items || [];
+
+    // Respeita seleção/edição quando o usuário está no modo "Editar itens"
+    const sel = (pdfSelKeys && pdfSelKeys.size) ? pdfSelKeys : null;
+    const itemsEff = sel ? items.filter(it => sel.has(selItemKey(it))) : items;
+
+    const ed = (pdfSelEdits && pdfSelEdits.size) ? pdfSelEdits : null;
+    const itemsFinal = itemsEff.map(it => {
+      const k = selItemKey(it);
+      const ed2 = ed ? ed.get(k) : null;
+      if (!ed2) return it;
+      const qty = (ed2.qty !== undefined && ed2.qty !== null) ? Number(ed2.qty || 0) : Number(it.qtyTotal || 0);
+      const desc = (ed2.desc !== undefined && ed2.desc !== null) ? String(ed2.desc) : String(it.desc);
+      const unit = Number(it.unit || 0) || 0;
+      return {...it, key: k, desc, qtyTotal: qty, total: unit * qty};
+    });
+
+    // Descontos (quando houver): usa o mesmo Map pdfDiscounts e o mesmo applyDiscountToItem
+    const applyDisc = !!document.getElementById('pSelectItemsMode')?.checked;
+    const itemsForPdf = applyDisc ? itemsFinal.map(applyDiscountToItem) : itemsFinal;
+
+    // Totais (mesma regra do PDF principal)
+    const feeTotal = (fee > 0) ? (fee * (feeTimes || 0)) : 0;
+    const laborAcordo = itemsForPdf.filter(isLaborItem).reduce((a,it) => a + (Number(it.total) || 0), 0);
+    const laborTabela = itemsForPdf.filter(isLaborItem).reduce((a,it) => {
+      const q = Number(it.qtyTotal ?? it.qty ?? 0) || 0;
+      const uo = Number((it.unitOrig ?? it.unit) || 0) || 0;
+      return a + (uo * q);
+    }, 0);
+    const laborDiff = laborTabela > 0 ? ((laborTabela - laborAcordo) / laborTabela) * 100 : 0;
+    const partsTotal = itemsForPdf.filter(it => !isLaborItem(it)).reduce((a,it) => a + (Number(it.total) || 0), 0);
+
+    const partsSubtotalNoDisc = itemsForPdf.filter(it => !isLaborItem(it)).reduce((a,it) => {
+      const q = Number(it.qtyTotal ?? it.qty ?? 0) || 0;
+      const uo = Number((it.unitOrig ?? it.unit) || 0) || 0;
+      return a + (uo * q);
+    }, 0);
+
+    const discountCents = itemsForPdf.reduce((acc,it) => {
+      const pct = Number(it.discountPct || 0);
+      if (!(pct > 0)) return acc;
+      const qty = Number(it.qtyTotal ?? it.qty ?? 0) || 0;
+      const uo = Number((it.unitOrig ?? it.unit) || 0) || 0;
+      const uf = Number(it.unit || 0) || 0;
+      const lineDiscC = Math.round((toCents(uo) - toCents(uf)) * qty);
+      return acc + lineDiscC;
+    }, 0);
+
+    const discountTotal = fromCents(discountCents);
+    const partsNetSummary = fromCents(Math.round(toCents(partsSubtotalNoDisc) - discountCents));
+
+    const totalAcordo = (discountCents > 0) ? (partsNetSummary + laborAcordo + feeTotal) : (partsTotal + laborAcordo + feeTotal);
+    const totalTabela = (partsSubtotalNoDisc + laborTabela + feeTotal);
+
+    const periodo = Math.max(0, Math.abs((hFim || 0) - (hIni || 0)));
+    const costHourAcordo = (periodo > 0) ? (totalAcordo / periodo) : 0;
+    const costHourTabela = (periodo > 0) ? (totalTabela / periodo) : 0;
+
+    function pctStr(tabela, acordo){
+      const t = Number(tabela || 0);
+      const a = Number(acordo || 0);
+      if (!t || t <= 0) return '0%';
+      const pct = ((t - a) / t) * 100;
+      const p = Math.round(pct * 10) / 10;
+      return p.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+    }
+
+    const feeLabel = feeTimes ? `Atendimento (${feeTimes}x)` : 'Atendimento';
+
+    const bens = (typeof BENEFICIOS !== 'undefined' && Array.isArray(BENEFICIOS)) ? BENEFICIOS.slice(0, 9) : [];
+    const beneficiosHtml = (bens.length ? bens : [
+      'Flexibilidade no pagamento.',
+      'Previsibilidade no custo das manutenções preventivas.',
+      'Prioridade em atendimentos.',
+      'Equipe treinada e capacitada pelo fabricante.'
+    ]).map(b => `<li>${esc(String(b))}</li>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resumo Proposta - ${esc(clientName)}</title>
+  <style>
+      :root {
+        --bg: #f5f5f5;
+        --surface: #ffffff;
+        --surface2: #f8f9fa;
+        --text: #1a1a1a;
+        --muted: #6b7280;
+        --border: #d1d5db;
+        --primary: #2563eb;
+        --good: #16a34a;
+        --bad: #dc2626;
+        --warn: #d97706;
+        --radius: 14px;
+        --shadow: 0 4px 16px rgba(0,0,0,.08);
+      }
+
+    *{margin:0;padding:0;box-sizing:border-box}
+
+    body{
+      font-family:system-ui,-apple-system,'Segoe UI',Roboto,Ubuntu,sans-serif;
+      color:var(--text);
+      background: #ffffff !important;
+      padding:28px 18px;
+    }
+
+    .container{
+      max-width:980px;
+      margin:0 auto;
+      background: var(--surface);
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow: var(--shadow);
+      backdrop-filter: none;
+      overflow:hidden;
+    }
+
+    .header{
+      padding:22px 22px 18px;
+      border-bottom:1px solid var(--border);
+      background: #eef2ff;
+    }
+
+    .headerTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+
+    .titleBlock h1{
+      font-size:18px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      margin:0;
+    }
+
+    .titleBlock .sub{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid rgba(45,212,255,.22);
+      border-radius:999px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    .section{padding:18px 22px 22px}
+
+    .sectionTitle{
+      font-size:13px;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      color: var(--muted);
+      margin:0 0 12px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .sectionTitle:after{
+      content:'';
+      height:1px;
+      flex:1;
+      background: linear-gradient(90deg, rgba(45,212,255,.55), transparent);
+    }
+
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:860px){.grid2{grid-template-columns:1fr}}
+
+    .infoBox{
+      background: var(--surface2);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+    }
+
+    .infoRow{display:flex;gap:10px;align-items:baseline;margin-bottom:8px}
+    .infoRow:last-child{margin-bottom:0}
+    .infoLabel{min-width:102px;color:var(--muted);font-weight:700;font-size:12px}
+    .infoValue{color:var(--text);font-weight:700;font-size:13px;flex:1}
+
+    .tableWrap{overflow-x:auto;border-radius:14px;border:1px solid rgba(47,61,106,.75)}
+
+    table{width:100%;border-collapse:collapse}
+
+    thead th{
+      position:sticky;top:0;
+      background: #e5e7eb;
+      color: #0f172a;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.10em;
+      padding:12px;
+      border-bottom:1px solid var(--border);
+    }
+
+    tbody td{
+      padding:11px 12px;
+      border-bottom:1px solid rgba(47,61,106,.55);
+      font-size:13px;
+    }
+
+    tbody tr:hover{background: #f1f5f9}
+
+    .numCol{text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-weight:800}
+    .pctCol{text-align:center;font-weight:900;color:var(--primary)}
+
+    .neg{color: rgba(239,68,68,.95)}
+
+    .totalRow{
+      background: var(--surface2);
+      font-weight:900;
+    }
+
+    .paymentBox{
+      margin-top:14px;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid rgba(45,212,255,.22);
+      background: #eff6ff;
+    }
+
+    .paymentBox .label{
+      font-size:12px;
+      color: var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.10em;
+    }
+
+    .paymentBox .value{
+      margin-top:8px;
+      font-size:14px;
+      font-weight:900;
+      color: var(--text);
+    }
+
+    .highlight{
+      border-radius:14px;
+      border:1px solid rgba(34,197,94,.28);
+      background: rgba(34,197,94,.08);
+      padding:14px;
+    }
+
+    .highlight .title{
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.10em;
+      color: #0f172a;
+      margin-bottom:10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .benefitsList{list-style:none;display:grid;gap:10px}
+    .benefitsList li{display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:13px;line-height:1.35}
+    .benefitsList li:before{content:'✓';display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background: rgba(34,197,94,.22);border:1px solid rgba(34,197,94,.45);color: var(--good);font-weight:900;flex:0 0 auto}
+
+    
+    @media print{
+      @page { size: A4 portrait; margin: 4mm; }
+      html, body{ background:#ffffff !important; }
+      *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+      body{
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+      }
+
+      .container{
+        width: 202mm !important;
+        max-width: none !important;
+        margin: 0 auto !important;
+        background: #ffffff !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+      }
+
+      .header{
+        padding: 6mm 6mm 4mm !important;
+        background: #f1f5f9 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+      }
+
+      .headerTop{ padding: 0 !important; margin-bottom: 2mm !important; }
+      .headerTop h1{ font-size: 18px !important; }
+
+      .section{ padding: 3mm 6mm 3mm !important; }
+      .grid2{ gap: 8px !important; }
+
+      .infoBox, .paymentBox{
+        padding: 8px 10px !important;
+        background: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+      }
+
+      .tableWrap{ border: 1px solid #e5e7eb !important; }
+      .tableWrap table th, .tableWrap table td{ padding: 4px 6px !important; font-size: 10.8px !important; }
+      .sectionTitle{ margin-bottom: 6px !important; }
+
+      .benefitsList{ columns: 2; column-gap: 12px; }
+      .benefitsList li{ break-inside: avoid-column; font-size: 10px !important; line-height: 1.15 !important; margin: 0 0 5px 0 !important; }
+      .benefitsList li:before{ width: 18px !important; height: 18px !important; }
+
+      /* Safety: avoid page breaks */
+      .container, .section, .tableWrap{ page-break-inside: avoid !important; break-inside: avoid !important; }
+    }
+
+    </style>
+      <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></scr${'ipt'}>
+      <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></scr${'ipt'}>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="headerTop">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+          <div style="width:150px;height:44px;display:flex;align-items:center;justify-content:flex-start">
+            <img src="Nors.png" alt="Nors" style="max-width:150px;max-height:44px;display:block" />
+          </div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center">
+            <h1 style="font-size:28px;font-weight:700;letter-spacing:0.02em;text-align:center;margin:0">Proposta PMP</h1>
+          </div>
+          <div style="width:150px;height:44px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sectionTitle">Dados</div>
+      <div class="grid2">
+        <div class="infoBox">
+          <div class="infoRow"><div class="infoLabel">Cliente</div><div class="infoValue">${esc(clientName || '-')}</div></div>
+          <div class="infoRow"><div class="infoLabel">Telefone</div><div class="infoValue">${esc(clientPhone || '-')}</div></div>
+          <div class="infoRow"><div class="infoLabel">E-mail</div><div class="infoValue">${esc(clientEmail || '-')}</div></div>
+          <div class="infoRow"><div class="infoLabel">Cidade</div><div class="infoValue">${esc(city || '-')}</div></div>
+        </div>
+        <div class="infoBox">
+          <div class="infoRow"><div class="infoLabel">Modelo</div><div class="infoValue">${esc(model || '-')}</div></div>
+          <div class="infoRow"><div class="infoLabel">Série</div><div class="infoValue">${esc(serie || '-')}</div></div>
+          <div class="infoRow"><div class="infoLabel">Horas</div><div class="infoValue">${esc(String(hIni || 0))} → ${esc(String(hFim || 0))}</div></div>
+        </div>
+      </div>
+
+      <div class="paymentBox">
+        <div class="label">Condição de pagamento</div>
+        <div class="value">${esc(payCond || 'A combinar')}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sectionTitle">Comparativo Financeiro</div>
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40%">Item</th>
+              <th style="width:22%" class="numCol">Valor de acordo</th>
+              <th style="width:22%" class="numCol">Valor de tabela</th>
+              <th style="width:16%" class="pctCol">% Desconto</th>
+            </tr>
+          </thead>
+          <tbody>            <tr>
+              <td>Peças (líquido)</td>
+              <td class="numCol">${fmtBRL2(partsNetSummary)}</td>
+              <td class="numCol">${fmtBRL2(partsSubtotalNoDisc)}</td>
+              <td class="pctCol">${pctStr(partsSubtotalNoDisc, partsNetSummary)}</td>
+            </tr>
+            <tr>
+              <td>Desconto</td>
+              <td class="numCol ${discountCents>0?'neg':''}">${discountCents>0 ? ('-' + fmtBRL2(discountTotal)) : fmtBRL2(0)}</td>
+              <td class="numCol">${fmtBRL2(0)}</td>
+              <td class="pctCol">${discountCents>0 ? pctStr(partsSubtotalNoDisc, partsNetSummary) : '0%'}</td>
+            </tr>
+            
+            <tr>
+              <td>Total de mão de obra</td>
+              <td class="numCol">${fmtBRL2(laborAcordo)}</td>
+              <td class="numCol">${fmtBRL2(laborTabela)}</td>
+              <td class="pctCol" style="color:${laborDiff > 0 ? 'var(--good)' : 'inherit'}">${(laborTabela>0? laborDiff:0).toFixed(1).replace('.',',')}%</td>
+            </tr>
+            <tr>
+              <td>${esc(feeLabel)}</td>
+              <td class="numCol">${fmtBRL2(feeTotal)}</td>
+              <td class="numCol">${fmtBRL2(feeTotal)}</td>
+              <td class="pctCol">0%</td>
+            </tr>
+            <tr class="totalRow">
+              <td>Valor total</td>
+              <td class="numCol">${fmtBRL2(totalAcordo)}</td>
+              <td class="numCol">${fmtBRL2(totalTabela)}</td>
+              <td class="pctCol">${pctStr(totalTabela, totalAcordo)}</td>
+            </tr>
+            <tr>
+              <td>Custo hora</td>
+              <td class="numCol">${fmtBRL2(costHourAcordo)}</td>
+              <td class="numCol">${fmtBRL2(costHourTabela)}</td>
+              <td class="pctCol">${pctStr(costHourTabela, costHourAcordo)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sectionTitle">Benefícios do acordo</div>
+      <div class="highlight">
+        <ul class="benefitsList">${beneficiosHtml}</ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+  async function downloadPdfOnePage(){
+    const el = document.querySelector('.pdfPage');
+    if(!el) return;
+    const canvas = await html2canvas(el, {scale: 2, backgroundColor: '#ffffff', useCORS: true});
+    const img = canvas.toDataURL('image/png');
+    const jsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : null;
+    if(!jsPDF) { window.print(); return; }
+    const pdf = new jsPDF('p','mm','a4');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const props = pdf.getImageProperties(img);
+    let imgW = pageW;
+    let imgH = props.height * imgW / props.width;
+    if(imgH > pageH){
+      const scale = pageH / imgH;
+      imgW = imgW * scale;
+      imgH = pageH;
+      const x = (pageW - imgW) / 2;
+      pdf.addImage(img, 'PNG', x, 0, imgW, imgH);
+    } else {
+      pdf.addImage(img, 'PNG', 0, 0, imgW, imgH);
+    }
+    pdf.save('Proposta-PMP-Resumo.pdf');
+  }
+
+  window.addEventListener('load', () => {
+    const btn = document.getElementById('btnDownloadPdfOnePage');
+    if(btn) btn.addEventListener('click', downloadPdfOnePage);
+  });
+</scr${'ipt'}>
+</body>
+</html>`;
+
+    return html;
+  }
+
+
+  function buildPrintHTML(){
     const clientName = getVal('pClientName');
     const clientPhone = getVal('pClientPhone');
     const clientEmail = getVal('pClientEmail');
@@ -3387,6 +3909,26 @@ async function exportProposalPDF(){
       const client = document.getElementById('pClientName')?.value || 'Cliente';
       pdf.save('Proposta - ' + safeFileName(client) + '.pdf');
 
+      // --- PDF extra: Página de Resumo (não mescla com o PDF principal) ---
+      const generateSummary = document.getElementById('pGenerateSummary')?.checked || false;
+      if (generateSummary) {
+        try {
+          const summaryHTML = buildSummaryPDF();
+          const summaryWin = window.open('', '_blank');
+          if (summaryWin) {
+            summaryWin.document.open();
+            summaryWin.document.write(summaryHTML);
+            summaryWin.document.close();
+            setTimeout(() => {
+              try { summaryWin.print(); } catch {}
+            }, 600);
+          }
+        } catch (e) {
+          console.error('Erro ao gerar PDF resumo:', e);
+        }
+      }
+
+
     // Se marcado no modal, exporta também o XLS com os preços finais do PDF
     try{
       const doXls = !!document.getElementById('pExportXlsWithPdf')?.checked;
@@ -3403,6 +3945,7 @@ async function exportProposalPDF(){
       pdfDiscounts = new Map();
       window.__discountItems = null;
       printArea.style.display = 'none';
+
     }
   }
 
